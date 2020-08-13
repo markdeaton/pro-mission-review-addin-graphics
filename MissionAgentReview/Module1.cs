@@ -53,7 +53,7 @@ namespace MissionAgentReview {
 
         protected override bool Initialize() {
             _tocToken = TOCSelectionChangedEvent.Subscribe(OnTOCSelectionChanged);
-           
+
             return base.Initialize();
         }
         protected override void Uninitialize() {
@@ -150,84 +150,118 @@ namespace MissionAgentReview {
         }
 
         private void OnAgentSelected(string agentName) {
-            QueuedTask.Run(() => {
+            ProgressorSource ps = new ProgressorSource("Finding agent path...", false);
+            QueuedTask.Run<object>(() => {
+                CIMSymbolReference symbolRef = ArrowSym().MakeSymbolReference();
 
                 // Get tracks for agent, sorted by datetime
                 QueryFilter agentTracksQF = new QueryFilter() {
                     PostfixClause = $"ORDER BY {FIELD_CREATEDATETIME}",
                     WhereClause = $"{FIELD_AGENTNAME} = '{agentName}'"
                 };
-                // Create graphics overlay
-                var map = MapView.Active.Map;
-                if (map.MapType != MapType.Map)
-                    return; // not 2D
-                var gl_param = new GraphicsLayerCreationParams { Name = $"Agent Path: {agentName}" };
 
-                // Create polylines between tracks, symbolized with arrows
-                /* TODO Creating graphics layer adds and selects it, triggering the TOCSelectionChange event and nulling out the _lyrAgentTracks reference.
-                 * Have to wait till after this query to create the graphics layer and add elemnts to it. */
-                using (RowCursor rowCur = _lyrAgentTracks.Search(agentTracksQF)) {
-                    MapPoint prevPt = null;
-                    List<CIMLineGraphic> graphics = new List<CIMLineGraphic>();
+                Map map = MapView.Active.Map;
+                if (map.MapType == MapType.Map) {
+                    string graphicsLayerName = $"Agent Path: {agentName}";
 
-                    while (rowCur.MoveNext()) {
+                    // Create polylines between tracks, symbolized with arrows
+                    /* TODO Creating graphics layer adds and selects it, triggering the TOCSelectionChange event and nulling out the _lyrAgentTracks reference.
+                     * Have to wait till after this query to create the graphics layer and add elemnts to it. */
+                    using (RowCursor rowCur = _lyrAgentTracks.Search(agentTracksQF)) {
+                        MapPoint prevPt = null;
+                        List<CIMLineGraphic> graphics = new List<CIMLineGraphic>();
+                        CIMPointGraphic startGraphic = null;
 
-                        using (Feature feat = (Feature)rowCur.Current) {
-                            MapPoint pt = (MapPoint)feat.GetShape();
+                        while (rowCur.MoveNext()) {
 
-                            if (prevPt == null) { // Create start graphic
-                                CreateAgentStartGraphic(pt);
+                            using (Feature feat = (Feature)rowCur.Current) {
+                                MapPoint pt = (MapPoint)feat.GetShape();
+
+                                if (prevPt == null) { // Create start graphic
+                                    startGraphic = CreateAgentStartGraphic(pt);
+                                }
+
+                                if (prevPt != null) { // Create a linking graphic
+                                    CIMLineGraphic graphic = CreateAgentTrackLinkGraphic(prevPt, pt, symbolRef);
+                                    graphics.Add(graphic);
+                                }
+                                prevPt = pt;
                             }
-
-                            if (prevPt != null) { // Create a linking graphic
-                                CIMLineGraphic graphic = CreateAgentTrackLinkGraphic(prevPt, pt);
-                                graphics.Add(graphic);
-                            }
-                            prevPt = pt;
                         }
-                    }
+                        System.Diagnostics.Debug.WriteLine($"{graphics.Count} lines created");
 
-                    if (prevPt != null) { // Create end graphic
-                        CreateAgentEndGraphic(prevPt);
-                    }
+                        if (prevPt != null) { // Create end graphic
+                            CreateAgentEndGraphic(prevPt);
+                        }
 
-                    //By default will be added to the top of the TOC
-                    GraphicsLayer graphicsLayer = LayerFactory.Instance.CreateLayer<ArcGIS.Desktop.Mapping.GraphicsLayer>(gl_param, map);
-                    foreach (CIMLineGraphic graphic in graphics) graphicsLayer.AddElement(graphic);
+                        // Now that we have our graphics, we need a graphics layer. If it already exists, clear and reuse it; otherwise, create one.
+                        GraphicsLayer graphicsLayer = null;
+
+                        IReadOnlyList<Layer> layers = map.FindLayers(graphicsLayerName, true);
+                        if (layers.Count > 0 && layers.FirstOrDefault() is GraphicsLayer) { // Use the first one found
+                            graphicsLayer = (GraphicsLayer)layers.FirstOrDefault();
+                            graphicsLayer.RemoveElements();
+                        } else {
+                            // Create graphics overlay
+                            // Unfortunately, the layer gets automatically selected and there doesn't seem to be a way to change that...
+                            GraphicsLayerCreationParams gl_param = new GraphicsLayerCreationParams() { Name = graphicsLayerName };
+                            graphicsLayer = LayerFactory.Instance.CreateLayer<ArcGIS.Desktop.Mapping.GraphicsLayer>(gl_param, map);
+                        }
+                        foreach (CIMLineGraphic graphic in graphics) graphicsLayer?.AddElement(graphic);
+                        graphicsLayer?.AddElement(startGraphic);
+                        graphicsLayer.SetVisibility(true);
+                    }
                 }
-            });
+                return null;
+            }, ps.Progressor);
 
-            void CreateAgentStartGraphic(MapPoint pt) {
-
+            CIMPointGraphic CreateAgentStartGraphic(MapPoint pt) {
+                CIMPointGraphic start = new CIMPointGraphic() {
+                    Location = pt,
+                    Symbol = AgentStartSymbol.MakeSymbolReference()
+                };
+                return start;
             }
             void CreateAgentEndGraphic(MapPoint pt) {
 
             }
-            CIMLineGraphic CreateAgentTrackLinkGraphic(MapPoint ptStart, MapPoint ptEnd) {
+            CIMLineSymbol ArrowSym() {
+                Random rand = new Random();
+                double r = Math.Floor(rand.NextDouble() * 256.0); double g = Math.Floor(rand.NextDouble() * 256.0); double b = Math.Floor(rand.NextDouble() * 256.0);
+                CIMColor color = ColorFactory.Instance.CreateRGBColor(r, g, b);
+                CIMMarker markerTriangle = SymbolFactory.Instance.ConstructMarker(color, 8, SimpleMarkerStyle.Triangle);
+                markerTriangle.Rotation = -90; // or -90
+                markerTriangle.MarkerPlacement = new CIMMarkerPlacementOnLine() { AngleToLine = true, RelativeTo = PlacementOnLineRelativeTo.LineEnd };
+
+                var lineSymbolWithArrow = new CIMLineSymbol() {
+                    SymbolLayers = new CIMSymbolLayer[2] {
+                            markerTriangle, SymbolFactory.Instance.ConstructStroke(color, 2)
+                        }
+                };
+                return lineSymbolWithArrow;
+            }
+            CIMLineGraphic CreateAgentTrackLinkGraphic(MapPoint ptStart, MapPoint ptEnd, CIMSymbolReference symbolRef) {
                 CIMLineGraphic link = new CIMLineGraphic() {
                     Line = PolylineBuilder.CreatePolyline(new List<MapPoint>() { ptStart, ptEnd }),
-                    Symbol = ArrowSym().MakeSymbolReference() // _agentTrackLinkSymbol.MakeSymbolReference()
+                    Symbol = symbolRef // _agentTrackLinkSymbol.MakeSymbolReference()
                 };
                 return link;
-
-                CIMLineSymbol ArrowSym() {
-                    var markerTriangle = SymbolFactory.Instance.ConstructMarker(ColorFactory.Instance.RedRGB, 12, SimpleMarkerStyle.Triangle);
-                    markerTriangle.Rotation = -90; // or -90
-                    markerTriangle.MarkerPlacement = new CIMMarkerPlacementOnLine() { AngleToLine = true, RelativeTo = PlacementOnLineRelativeTo.LineEnd };
-
-                    var lineSymbolWithArrow = new CIMLineSymbol() {
-                        SymbolLayers = new CIMSymbolLayer[2] { 
-                            markerTriangle, SymbolFactory.Instance.ConstructStroke(ColorFactory.Instance.RedRGB, 2)
-                        }
-                    };
-                    return lineSymbolWithArrow;
-                }
             }
         }
-        private CIMLineSymbol _agentTrackLinkSymbol = SymbolFactory.Instance.ConstructLineSymbol(
-            ColorFactory.Instance.CreateColor(Colors.Gold), 3);
 
         #region Properties
+        private static CIMPointSymbol _agentStartSymbol;
+        private static CIMPointSymbol AgentStartSymbol {
+            get {
+                if (_agentStartSymbol == null) {
+                    _agentStartSymbol = SymbolFactory.Instance.ConstructPointSymbol(ColorFactory.Instance.GreenRGB, 16, SimpleMarkerStyle.Triangle);
+                    //markerTriangle.Rotation = -90; // or -90
+                }
+                return _agentStartSymbol;
+            }
+        }
+
+        
         public static string PROP_AGENTLIST = "Agent List";
         private static StringCollection _agentList = new StringCollection();
         public static StringCollection AgentList {
@@ -235,7 +269,7 @@ namespace MissionAgentReview {
                 return _agentList;
             }
         }
-        
+
         private static string _selectedAgentName;
         public static string SelectedAgentName {
             get {
