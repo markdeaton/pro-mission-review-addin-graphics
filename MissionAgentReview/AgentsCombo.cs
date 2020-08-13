@@ -69,9 +69,11 @@ namespace MissionAgentReview {
             if (string.IsNullOrEmpty(item.Text))
                 return;
 
-            // TODO  Code behavior when selection changes.
-
+            
+            Module1.SelectedAgentName = item.Text;
         }
+        
+        
         #endregion
 
     }

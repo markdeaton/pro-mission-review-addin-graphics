@@ -12,9 +12,15 @@
   </AddInInfo>
   <conditions>
     <!-- our custom condition -->
-    <insertCondition id="AgentTrackPathsToolsEnabled_Condition" caption="Agent Track Review Button Enabled?">
+    <insertCondition id="MissionReviewToolsEnabled_Condition" caption="Mission Review Tools Enabled?">
       <!-- our condition is set true or false based on this underlying state -->
       <state id="trackFeatureLayerSelected_state" />
+    </insertCondition>
+    <insertCondition id="AgentTrackToolsEnabled_Condition" caption="Agent Track Tools Enabled?">
+      <and>
+        <state id="trackFeatureLayerSelected_state"/>
+        <state id="esri_mapping_MapCondition"/>
+      </and>
     </insertCondition>
   </conditions>
   <modules>
@@ -27,14 +33,14 @@
         </tabGroup>
       </tabGroups>
       <tabs>
-        <tab id="MissionAgentReview_Tab1" caption="Post-Mission Review" condition="AgentTrackPathsToolsEnabled_Condition" keytip="A" tabGroupID="MissionReview_TabGroup">
+        <tab id="MissionAgentReview_Tab1" caption="Post-Mission Review" condition="MissionReviewToolsEnabled_Condition" keytip="A" tabGroupID="MissionReview_TabGroup">
           <group refID="MissionAgentReview_Group1" />
         </tab>
       </tabs>
       <groups>
         <!-- comment this out if you have no controls on the Addin tab to avoid
               an empty group-->
-        <group id="MissionAgentReview_Group1" caption="Agent Tracks" appearsOnAddInTab="false">
+        <group id="MissionAgentReview_Group1" caption="Agent Tracks" appearsOnAddInTab="false" >
           <!-- host controls within groups -->
           <!--<button refID="MissionAgentReview_Button1" size="large" />-->
           <comboBox refID="MissionAgentReview_AgentsCombo" size="large"/>
@@ -43,7 +49,9 @@
       <controls>
         <!-- add your controls here -->
         <!-- Combo Box that holds the list of agents -->
-        <comboBox id="MissionAgentReview_AgentsCombo" caption="Mission Agents:" className="AgentsCombo" itemWidth="140" extendedCaption="Choose from this list of agents to examine an agent's path during the mission." isEditable="false" isReadOnly="true" resizable="true">
+        <comboBox id="MissionAgentReview_AgentsCombo" caption="Mission Agents:" className="AgentsCombo" 
+                  itemWidth="140" extendedCaption="Choose from this list of agents to examine an agent's path during the mission." isEditable="false" isReadOnly="true" resizable="true"
+                  editHint="No agent selected">
           <tooltip heading="Tooltip Heading">Tooltip text<disabledText /></tooltip>
         </comboBox>
       </controls>

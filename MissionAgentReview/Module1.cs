@@ -1,6 +1,8 @@
 ﻿using ArcGIS.Core.CIM;
 using ArcGIS.Core.Data;
 using ArcGIS.Core.Events;
+using ArcGIS.Core.Geometry;
+using ArcGIS.Core.Internal.CIM;
 using ArcGIS.Desktop.Editing;
 using ArcGIS.Desktop.Framework;
 using ArcGIS.Desktop.Framework.Contracts;
@@ -11,16 +13,22 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Windows.Media;
+using Field = ArcGIS.Core.Data.Field;
+using QueryFilter = ArcGIS.Core.Data.QueryFilter;
 
 namespace MissionAgentReview {
     internal class Module1 : Module {
         private static Module1 _this = null;
         private SubscriptionToken _tocToken;
-        private QueryFilter _agentListQueryFilter;
+        private QueryFilter _agentListQueryFilter = new QueryFilter() {
+            PrefixClause = "DISTINCT",
+            SubFields = FIELD_AGENTNAME
+        };
         private const string FIELD_AGENTNAME = "created_user";
+        private const string FIELD_CREATEDATETIME = "created_date";
         private FeatureLayer _lyrAgentTracks;
 
         /// <summary>
@@ -46,10 +54,6 @@ namespace MissionAgentReview {
         protected override bool Initialize() {
             _tocToken = TOCSelectionChangedEvent.Subscribe(OnTOCSelectionChanged);
            
-            _agentListQueryFilter = new QueryFilter();
-            _agentListQueryFilter.PrefixClause = "DISTINCT";
-            _agentListQueryFilter.SubFields = FIELD_AGENTNAME;
-            
             return base.Initialize();
         }
         protected override void Uninitialize() {
@@ -103,7 +107,7 @@ namespace MissionAgentReview {
                                 TableDefinition tblDef = fc.GetDefinition();
                                 IReadOnlyList<Field> fields = tblDef.GetFields();
                                 hasUserField = fields.Any((fld => fld.Name == FIELD_AGENTNAME && fld.FieldType == FieldType.String));
-                                hasCreateDateField = fields.Any((fld => fld.Name == "created_date" && fld.FieldType == FieldType.Date));
+                                hasCreateDateField = fields.Any((fld => fld.Name == FIELD_CREATEDATETIME && fld.FieldType == FieldType.Date));
                                 if (hasUserField && hasCreateDateField) lyrFound = featLyr;
                             }
                         } catch (Exception e) {
@@ -135,7 +139,7 @@ namespace MissionAgentReview {
                     using (RowCursor rowCur = fc.Search(_agentListQueryFilter)) {
                         while (rowCur.MoveNext()) {
                             using (Row row = rowCur.Current) {
-                                _agentList.Add(row[row.FindField(FIELD_AGENTNAME)].ToString()); // Assumes only one field in the query filter
+                                _agentList.Add(row[FIELD_AGENTNAME].ToString()); // Assumes only one field in the query filter
                             }
                         }
                     }
@@ -144,6 +148,84 @@ namespace MissionAgentReview {
                 });
             }
         }
+
+        private void OnAgentSelected(string agentName) {
+            QueuedTask.Run(() => {
+
+                // Get tracks for agent, sorted by datetime
+                QueryFilter agentTracksQF = new QueryFilter() {
+                    PostfixClause = $"ORDER BY {FIELD_CREATEDATETIME}",
+                    WhereClause = $"{FIELD_AGENTNAME} = '{agentName}'"
+                };
+                // Create graphics overlay
+                var map = MapView.Active.Map;
+                if (map.MapType != MapType.Map)
+                    return; // not 2D
+                var gl_param = new GraphicsLayerCreationParams { Name = $"Agent Path: {agentName}" };
+
+                // Create polylines between tracks, symbolized with arrows
+                /* TODO Creating graphics layer adds and selects it, triggering the TOCSelectionChange event and nulling out the _lyrAgentTracks reference.
+                 * Have to wait till after this query to create the graphics layer and add elemnts to it. */
+                using (RowCursor rowCur = _lyrAgentTracks.Search(agentTracksQF)) {
+                    MapPoint prevPt = null;
+                    List<CIMLineGraphic> graphics = new List<CIMLineGraphic>();
+
+                    while (rowCur.MoveNext()) {
+
+                        using (Feature feat = (Feature)rowCur.Current) {
+                            MapPoint pt = (MapPoint)feat.GetShape();
+
+                            if (prevPt == null) { // Create start graphic
+                                CreateAgentStartGraphic(pt);
+                            }
+
+                            if (prevPt != null) { // Create a linking graphic
+                                CIMLineGraphic graphic = CreateAgentTrackLinkGraphic(prevPt, pt);
+                                graphics.Add(graphic);
+                            }
+                            prevPt = pt;
+                        }
+                    }
+
+                    if (prevPt != null) { // Create end graphic
+                        CreateAgentEndGraphic(prevPt);
+                    }
+
+                    //By default will be added to the top of the TOC
+                    GraphicsLayer graphicsLayer = LayerFactory.Instance.CreateLayer<ArcGIS.Desktop.Mapping.GraphicsLayer>(gl_param, map);
+                    foreach (CIMLineGraphic graphic in graphics) graphicsLayer.AddElement(graphic);
+                }
+            });
+
+            void CreateAgentStartGraphic(MapPoint pt) {
+
+            }
+            void CreateAgentEndGraphic(MapPoint pt) {
+
+            }
+            CIMLineGraphic CreateAgentTrackLinkGraphic(MapPoint ptStart, MapPoint ptEnd) {
+                CIMLineGraphic link = new CIMLineGraphic() {
+                    Line = PolylineBuilder.CreatePolyline(new List<MapPoint>() { ptStart, ptEnd }),
+                    Symbol = ArrowSym().MakeSymbolReference() // _agentTrackLinkSymbol.MakeSymbolReference()
+                };
+                return link;
+
+                CIMLineSymbol ArrowSym() {
+                    var markerTriangle = SymbolFactory.Instance.ConstructMarker(ColorFactory.Instance.RedRGB, 12, SimpleMarkerStyle.Triangle);
+                    markerTriangle.Rotation = -90; // or -90
+                    markerTriangle.MarkerPlacement = new CIMMarkerPlacementOnLine() { AngleToLine = true, RelativeTo = PlacementOnLineRelativeTo.LineEnd };
+
+                    var lineSymbolWithArrow = new CIMLineSymbol() {
+                        SymbolLayers = new CIMSymbolLayer[2] { 
+                            markerTriangle, SymbolFactory.Instance.ConstructStroke(ColorFactory.Instance.RedRGB, 2)
+                        }
+                    };
+                    return lineSymbolWithArrow;
+                }
+            }
+        }
+        private CIMLineSymbol _agentTrackLinkSymbol = SymbolFactory.Instance.ConstructLineSymbol(
+            ColorFactory.Instance.CreateColor(Colors.Gold), 3);
 
         #region Properties
         public static string PROP_AGENTLIST = "Agent List";
@@ -161,6 +243,8 @@ namespace MissionAgentReview {
             }
             set {
                 _selectedAgentName = value;
+                // Do something with the agent name
+                Current.OnAgentSelected(value);
             }
         }
 
