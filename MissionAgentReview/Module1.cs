@@ -170,7 +170,7 @@ namespace MissionAgentReview {
                     using (RowCursor rowCur = _lyrAgentTracks.Search(agentTracksQF)) {
                         MapPoint prevPt = null;
                         List<CIMLineGraphic> graphics = new List<CIMLineGraphic>();
-                        CIMPointGraphic startGraphic = null;
+                        CIMPointGraphic startGraphic = null, endGraphic = null;
 
                         while (rowCur.MoveNext()) {
 
@@ -191,7 +191,7 @@ namespace MissionAgentReview {
                         System.Diagnostics.Debug.WriteLine($"{graphics.Count} lines created");
 
                         if (prevPt != null) { // Create end graphic
-                            CreateAgentEndGraphic(prevPt);
+                            endGraphic = CreateAgentEndGraphic(prevPt);
                         }
 
                         // Now that we have our graphics, we need a graphics layer. If it already exists, clear and reuse it; otherwise, create one.
@@ -208,8 +208,10 @@ namespace MissionAgentReview {
                             graphicsLayer = LayerFactory.Instance.CreateLayer<ArcGIS.Desktop.Mapping.GraphicsLayer>(gl_param, map);
                         }
                         foreach (CIMLineGraphic graphic in graphics) graphicsLayer?.AddElement(graphic);
-                        graphicsLayer?.AddElement(startGraphic);
-                        graphicsLayer.SetVisibility(true);
+                        graphicsLayer?.AddElement(startGraphic); graphicsLayer?.AddElement(endGraphic);
+                        graphicsLayer?.SetVisibility(true);
+                        // TODO Crash upon exiting Pro if the following line is run:
+                        graphicsLayer?.UnSelectElements(null);
                     }
                 }
                 return null;
@@ -222,8 +224,12 @@ namespace MissionAgentReview {
                 };
                 return start;
             }
-            void CreateAgentEndGraphic(MapPoint pt) {
-
+            CIMPointGraphic CreateAgentEndGraphic(MapPoint pt) {
+                CIMPointGraphic end = new CIMPointGraphic() {
+                    Location = pt,
+                    Symbol = AgentEndSymbol.MakeSymbolReference()
+                };
+                return end;
             }
             CIMLineSymbol ArrowSym() {
                 Random rand = new Random();
@@ -254,14 +260,23 @@ namespace MissionAgentReview {
         private static CIMPointSymbol AgentStartSymbol {
             get {
                 if (_agentStartSymbol == null) {
-                    _agentStartSymbol = SymbolFactory.Instance.ConstructPointSymbol(ColorFactory.Instance.GreenRGB, 16, SimpleMarkerStyle.Triangle);
+                    _agentStartSymbol = SymbolFactory.Instance.ConstructPointSymbol(ColorFactory.Instance.GreenRGB, 16, SimpleMarkerStyle.Circle);
                     //markerTriangle.Rotation = -90; // or -90
                 }
                 return _agentStartSymbol;
             }
         }
 
-        
+        private static CIMPointSymbol _agentEndSymbol;
+        private static CIMPointSymbol AgentEndSymbol {
+            get {
+                if (_agentEndSymbol == null) {
+                    _agentEndSymbol = SymbolFactory.Instance.ConstructPointSymbol(ColorFactory.Instance.RedRGB, 16, SimpleMarkerStyle.Square);
+                }
+                return _agentEndSymbol;
+            }
+        }
+
         public static string PROP_AGENTLIST = "Agent List";
         private static StringCollection _agentList = new StringCollection();
         public static StringCollection AgentList {
