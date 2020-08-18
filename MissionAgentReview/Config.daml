@@ -1,10 +1,10 @@
 ﻿<ArcGIS defaultAssembly="MissionAgentReview.dll" defaultNamespace="MissionAgentReview" xmlns="http://schemas.esri.com/DADF/Registry" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schemas.esri.com/DADF/Registry file:///C:/Program%20Files/ArcGIS/Pro/bin/ArcGIS.Desktop.Framework.xsd">
   <AddInInfo id="{f12e418e-62f8-4094-b867-f8b3220ee73d}" version="1.0" desktopVersion="2.6.24783">
     <Name>MissionAgentReview</Name>
-    <Description>MissionAgentReview description</Description>
+    <Description>ArcGIS Mission Post-Review Tools</Description>
     <Image>Images\AddinDesktop32.png</Image>
     <Author>mark4238</Author>
-    <Company>Acme</Company>
+    <Company>Esri GeoXC</Company>
     <Date>8/3/2020 3:09:54 PM</Date>
     <Subject>Framework</Subject>
     <!-- Note subject can be one or more of these topics:
@@ -12,15 +12,18 @@
   </AddInInfo>
   <conditions>
     <!-- our custom condition -->
-    <insertCondition id="MissionReviewToolsEnabled_Condition" caption="Mission Review Tools Enabled?">
+    <insertCondition id="MissionReviewTabEnabled_Condition" caption="Mission Review Tools Tab Enabled?">
       <!-- our condition is set true or false based on this underlying state -->
-      <state id="trackFeatureLayerSelected_state" />
+      <or>
+        <state id="trackFeatureLayerSelected_state" />
+        <state id="agentTrackResultsAnalysis_state"/>
+      </or>
     </insertCondition>
-    <insertCondition id="AgentTrackToolsEnabled_Condition" caption="Agent Track Tools Enabled?">
-      <and>
+    <insertCondition id="AgentTrackGeneratorListEnabled_Condition" caption="Agent Track Generator Enabled?">
         <state id="trackFeatureLayerSelected_state"/>
-        <state id="esri_mapping_MapCondition"/>
-      </and>
+    </insertCondition>
+    <insertCondition id="LOSToolsEnabled_Condition" caption="Line of Sight Tools Enabled?">
+      <state id="agentTrackResultsAnalysis_state"/>
     </insertCondition>
   </conditions>
   <modules>
@@ -33,27 +36,37 @@
         </tabGroup>
       </tabGroups>
       <tabs>
-        <tab id="MissionAgentReview_Tab1" caption="Post-Mission Review" condition="MissionReviewToolsEnabled_Condition" keytip="A" tabGroupID="MissionReview_TabGroup">
-          <group refID="MissionAgentReview_Group1" />
+        <tab id="MissionAgentReview_Tab" caption="Post-Mission Review" condition="MissionReviewTabEnabled_Condition" keytip="A" tabGroupID="MissionReview_TabGroup">
+          <group refID="MissionReview_GenerateTracks_Group" />
+          <group refID="MissionReview_LOS_Group"/>
         </tab>
       </tabs>
       <groups>
-        <!-- comment this out if you have no controls on the Addin tab to avoid
-              an empty group-->
-        <group id="MissionAgentReview_Group1" caption="Agent Tracks" appearsOnAddInTab="false" >
+        <!-- Track line generation tools -->
+        <group id="MissionReview_GenerateTracks_Group" caption="Find Agent Tracks" appearsOnAddInTab="false">
           <!-- host controls within groups -->
           <!--<button refID="MissionAgentReview_Button1" size="large" />-->
-          <comboBox refID="MissionAgentReview_AgentsCombo" size="large"/>
+          <comboBox refID="MissionAgentReviewAgents_Combo" size="large"/>
+        </group>
+        <!-- Line of sight analysis tools -->
+        <group id="MissionReview_LOS_Group" caption="Sightline Analysis" appearsOnAddInTab="false">
+          <button refID="AgentTracksViewshed_Button" size="large"/>
         </group>
       </groups>
       <controls>
         <!-- add your controls here -->
         <!-- Combo Box that holds the list of agents -->
-        <comboBox id="MissionAgentReview_AgentsCombo" caption="Mission Agents:" className="AgentsCombo" 
+        <comboBox id="MissionAgentReviewAgents_Combo" caption="Mission Agents:" className="AgentsCombo" condition="AgentTrackGeneratorListEnabled_Condition"
                   itemWidth="140" extendedCaption="Choose from this list of agents to examine an agent's path during the mission." isEditable="false" isReadOnly="true" resizable="true"
                   editHint="No agent selected">
-          <tooltip heading="Tooltip Heading">Tooltip text<disabledText /></tooltip>
+          <tooltip heading="Agent track">Choose an agent to generate a mission track<disabledText>Select an agent track layer</disabledText>
+          </tooltip>
         </comboBox>
+        <!-- Viewshed button -->
+        <button id="AgentTracksViewshed_Button" className="MissionAgentReview_Module:OnAgentTrackViewshedButtonClick" caption="Viewshed" loadOnClick="false"
+                largeImage="Images\GenericButtonGreen32.png" smallImage="Images\GenericButtonGreen16.png">
+          <tooltip>Generate a viewshed for selected agents' tracks<disabledText>Select one or more agent track line result layers</disabledText></tooltip>
+        </button>
       </controls>
     </insertModule>
   </modules>

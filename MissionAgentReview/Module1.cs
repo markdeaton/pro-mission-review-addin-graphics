@@ -1,5 +1,6 @@
 ﻿using ArcGIS.Core.CIM;
 using ArcGIS.Core.Data;
+using ArcGIS.Core.Data.UtilityNetwork.Trace;
 using ArcGIS.Core.Events;
 using ArcGIS.Core.Geometry;
 using ArcGIS.Core.Internal.CIM;
@@ -7,6 +8,7 @@ using ArcGIS.Desktop.Editing;
 using ArcGIS.Desktop.Framework;
 using ArcGIS.Desktop.Framework.Contracts;
 using ArcGIS.Desktop.Framework.Threading.Tasks;
+using ArcGIS.Desktop.Layouts;
 using ArcGIS.Desktop.Mapping;
 using ArcGIS.Desktop.Mapping.Events;
 using System;
@@ -29,6 +31,7 @@ namespace MissionAgentReview {
         };
         private const string FIELD_AGENTNAME = "created_user";
         private const string FIELD_CREATEDATETIME = "created_date";
+        private const string AGENTTRACKLYRNAME_PREAMBLE = "Agent Path: ";
         private FeatureLayer _lyrAgentTracks;
 
         /// <summary>
@@ -66,21 +69,36 @@ namespace MissionAgentReview {
         /// </summary>
         /// <param name="obj">ArcGIS Pro map view reference</param>
         private void OnTOCSelectionChanged(MapViewEventArgs obj) {
+            bool isAgentTrackFeatLyrSelected = false;
+            bool areOnlyAgentTrackGraphicsLyrsSelected = true;
+
             MapView mv = obj.MapView;
-            bool isButtonEnabled = false;
             _lyrAgentTracks = null;
 
             QueuedTask.Run(() => {
+                // 1. Look for add-on feature enablement conditions in the selected layer list
                 foreach (Layer lyr in mv.GetSelectedLayers()) {
+                    // Only agent track result graphics layers selected?
+                    // Unfortunately, we can only search by graphic layer type and layer name
+                    areOnlyAgentTrackGraphicsLyrsSelected &=
+                        (lyr is GraphicsLayer && lyr.Name.StartsWith(AGENTTRACKLYRNAME_PREAMBLE));
+
                     // look for one that has all the characteristics of a Mission agent tracks layer
                     Task<FeatureLayer> lyrFound = isAgentTracksLayer(lyr);
                     if (lyrFound.Result != null) {
                         _lyrAgentTracks = lyrFound.Result;
-                        isButtonEnabled = true;
+                        isAgentTrackFeatLyrSelected = true;
                         break;
                     }
                 }
-                if (isButtonEnabled) {
+                // 2. Enable conditions/take other actions based on what we found about the selected layers list
+                if (areOnlyAgentTrackGraphicsLyrsSelected) {
+                    FrameworkApplication.State.Activate("agentTrackResultsAnalysis_state");
+                } else {
+                    FrameworkApplication.State.Deactivate("agentTrackResultsAnalysis_state");
+                }
+
+                if (isAgentTrackFeatLyrSelected) {
                     FrameworkApplication.State.Activate("trackFeatureLayerSelected_state");
                     populateAgentList();
                 } else {
@@ -161,8 +179,8 @@ namespace MissionAgentReview {
                 };
 
                 Map map = MapView.Active.Map;
-                if (map.MapType == MapType.Map) {
-                    string graphicsLayerName = $"Agent Path: {agentName}";
+                if (map.MapType == MapType.Map || map.MapType == MapType.Scene) {
+                    string graphicsLayerName = $"{AGENTTRACKLYRNAME_PREAMBLE}{agentName}";
 
                     // Create polylines between tracks, symbolized with arrows
                     /* TODO Creating graphics layer adds and selects it, triggering the TOCSelectionChange event and nulling out the _lyrAgentTracks reference.
@@ -208,10 +226,11 @@ namespace MissionAgentReview {
                             graphicsLayer = LayerFactory.Instance.CreateLayer<ArcGIS.Desktop.Mapping.GraphicsLayer>(gl_param, map);
                         }
                         foreach (CIMLineGraphic graphic in graphics) graphicsLayer?.AddElement(graphic);
-                        graphicsLayer?.AddElement(startGraphic); graphicsLayer?.AddElement(endGraphic);
+                        graphicsLayer?.AddElement(startGraphic); Element lastElt = graphicsLayer?.AddElement(endGraphic);
                         graphicsLayer?.SetVisibility(true);
-                        // TODO Crash upon exiting Pro if the following line is run:
-                        graphicsLayer?.UnSelectElements(null);
+                        // TODO Crash upon exiting Pro if the following line is run with a null or empty parameter:
+                        //graphicsLayer?.UnSelectElements(new List<Element>() { lastElt });
+                        graphicsLayer?.ClearSelection();
                     }
                 }
                 return null;
@@ -254,6 +273,18 @@ namespace MissionAgentReview {
                 return link;
             }
         }
+
+        #region LOS Toolset
+        internal static void OnAgentTrackViewshedButtonClick() {
+            System.Diagnostics.Debug.WriteLine("Viewshed Button clicked");
+        }
+        internal static bool CanOnAgentTrackViewshedButtonClick {
+            get {
+                bool isCanClick = FrameworkApplication.State.Contains("agentTrackResultsAnalysis_state");
+                return isCanClick;
+            }
+        }
+        #endregion
 
         #region Properties
         private static CIMPointSymbol _agentStartSymbol;
