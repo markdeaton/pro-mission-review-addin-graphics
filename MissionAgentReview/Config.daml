@@ -16,14 +16,26 @@
       <!-- our condition is set true or false based on this underlying state -->
       <or>
         <state id="trackFeatureLayerSelected_state" />
-        <state id="agentTrackResultsAnalysis_state"/>
+        <state id="onlyAgentTrackGraphicsLyrsAreSelected_state"/>
       </or>
     </insertCondition>
     <insertCondition id="AgentTrackGeneratorListEnabled_Condition" caption="Agent Track Generator Enabled?">
         <state id="trackFeatureLayerSelected_state"/>
     </insertCondition>
     <insertCondition id="LOSToolsEnabled_Condition" caption="Line of Sight Tools Enabled?">
-      <state id="agentTrackResultsAnalysis_state"/>
+      <and>
+        <state id="onlyAgentTrackGraphicsLyrsAreSelected_state"/>
+        <and> <!-- Scene view active state taken from ConditionQuery community sample -->
+          <state id="esri_mapping_mapPane" />
+          <or>
+            <state id="esri_mapping_mapViewingMode3DPerspectiveState" />
+            <state id="esri_mapping_mapViewingMode3DGlobeState" />
+          </or>
+        </and>
+      </and>
+    </insertCondition>
+    <insertCondition id="SequencingViewshedRunning_Condition" caption="Is a sequencing viewshed currently running?">
+      <state id="sequencingViewshedRunning_state"/>
     </insertCondition>
   </conditions>
   <modules>
@@ -56,14 +68,16 @@
       <controls>
         <!-- add your controls here -->
         <!-- Combo Box that holds the list of agents -->
-        <comboBox id="MissionAgentReviewAgents_Combo" caption="Mission Agents:" className="AgentsCombo" condition="AgentTrackGeneratorListEnabled_Condition"
+        <comboBox id="MissionAgentReviewAgents_Combo" caption="Mission Agents:" className="AgentsCombo" 
+                  condition="AgentTrackGeneratorListEnabled_Condition"
                   itemWidth="140" extendedCaption="Choose from this list of agents to examine an agent's path during the mission." isEditable="false" isReadOnly="true" resizable="true"
                   editHint="No agent selected">
           <tooltip heading="Agent track">Choose an agent to generate a mission track<disabledText>Select an agent track layer</disabledText>
           </tooltip>
         </comboBox>
         <!-- Viewshed button -->
-        <button id="AgentTracksViewshed_Button" className="MissionAgentReview_Module:OnAgentTrackViewshedButtonClick" caption="Viewshed" loadOnClick="false"
+        <button id="AgentTracksViewshed_Button" className="MissionAgentReview_Module:OnAgentTrackViewshedButtonClick" caption="Viewshed" loadOnClick="false" 
+                condition="LOSToolsEnabled_Condition" checkedCondition="SequencingViewshedRunning_Condition"
                 largeImage="Images\GenericButtonGreen32.png" smallImage="Images\GenericButtonGreen16.png">
           <tooltip>Generate a viewshed for selected agents' tracks<disabledText>Select one or more agent track line result layers</disabledText></tooltip>
         </button>

@@ -127,6 +127,7 @@
     <Compile Include="AgentsCombo.cs" />
     <Compile Include="Module1.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="TimeSequencingViewshed.cs" />
   </ItemGroup>
   <ItemGroup>
     <AddInContent Include="Images\GenericButtonGreen16.png" />

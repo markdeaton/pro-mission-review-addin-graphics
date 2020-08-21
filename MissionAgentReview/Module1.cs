@@ -15,8 +15,10 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Drawing.Text;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Timers;
 using System.Windows.Media;
 using Field = ArcGIS.Core.Data.Field;
 using QueryFilter = ArcGIS.Core.Data.QueryFilter;
@@ -32,7 +34,21 @@ namespace MissionAgentReview {
         private const string FIELD_AGENTNAME = "created_user";
         private const string FIELD_CREATEDATETIME = "created_date";
         private const string AGENTTRACKLYRNAME_PREAMBLE = "Agent Path: ";
-        private FeatureLayer _lyrAgentTracks;
+        private FeatureLayer _agentTracksFeatureLayer;
+
+        /// <summary>
+        /// Graphic attribute to hold the agent's heading at the beginning of a line connector
+        /// </summary>
+        private const string ATTR_HEADING_AT_START = "HeadingBeginning";
+        /// <summary>
+        /// Graphic attribute to hold the agent's heading at the end of a line connector
+        /// </summary>
+        private const string ATTR_HEADING_AT_END = "HeadingEnd";
+
+        /// <summary>
+        /// Name of Course (heading) attribute in agent tracks feature class attribute table
+        /// </summary>
+        private const string ATTR_COURSE = "Course";
 
         /// <summary>
         /// Retrieve the singleton instance to this module here
@@ -73,29 +89,28 @@ namespace MissionAgentReview {
             bool areOnlyAgentTrackGraphicsLyrsSelected = true;
 
             MapView mv = obj.MapView;
-            _lyrAgentTracks = null;
+            _agentTracksFeatureLayer = null;
 
             QueuedTask.Run(() => {
                 // 1. Look for add-on feature enablement conditions in the selected layer list
                 foreach (Layer lyr in mv.GetSelectedLayers()) {
                     // Only agent track result graphics layers selected?
                     // Unfortunately, we can only search by graphic layer type and layer name
-                    areOnlyAgentTrackGraphicsLyrsSelected &=
-                        (lyr is GraphicsLayer && lyr.Name.StartsWith(AGENTTRACKLYRNAME_PREAMBLE));
+                    areOnlyAgentTrackGraphicsLyrsSelected &= isAgentTracksGraphicsLayer(lyr);
 
                     // look for one that has all the characteristics of a Mission agent tracks layer
-                    Task<FeatureLayer> lyrFound = isAgentTracksLayer(lyr);
-                    if (lyrFound.Result != null) {
-                        _lyrAgentTracks = lyrFound.Result;
+                    Task<FeatureLayer> lyrFound = isAgentTracksFeatureLayer(lyr);
+                    if (_agentTracksFeatureLayer == null && lyrFound.Result != null) {
+                        _agentTracksFeatureLayer = lyrFound.Result;
                         isAgentTrackFeatLyrSelected = true;
-                        break;
+                        //break;
                     }
                 }
                 // 2. Enable conditions/take other actions based on what we found about the selected layers list
                 if (areOnlyAgentTrackGraphicsLyrsSelected) {
-                    FrameworkApplication.State.Activate("agentTrackResultsAnalysis_state");
+                    FrameworkApplication.State.Activate("onlyAgentTrackGraphicsLyrsAreSelected_state");
                 } else {
-                    FrameworkApplication.State.Deactivate("agentTrackResultsAnalysis_state");
+                    FrameworkApplication.State.Deactivate("onlyAgentTrackGraphicsLyrsAreSelected_state");
                 }
 
                 if (isAgentTrackFeatLyrSelected) {
@@ -109,7 +124,7 @@ namespace MissionAgentReview {
 
             //throw new NotImplementedException();
             // Find and return a layer matching specs for Agent Tracks layer. Return null if not found.
-            async Task<FeatureLayer> isAgentTracksLayer(Layer lyr) {
+            async Task<FeatureLayer> isAgentTracksFeatureLayer(Layer lyr) {
                 FeatureLayer lyrFound = null;
                 if (lyr is FeatureLayer) {
                     bool isPointGeom, isJoinedTable, hasDataRows, hasUserField, hasCreateDateField;
@@ -135,7 +150,7 @@ namespace MissionAgentReview {
                 } else if (lyr is GroupLayer) { // recursion for grouped layers
                     foreach (Layer groupedLyr in ((GroupLayer)lyr).Layers) {
                         try {
-                            Task<FeatureLayer> groupedLyrResult = isAgentTracksLayer(groupedLyr);
+                            Task<FeatureLayer> groupedLyrResult = isAgentTracksFeatureLayer(groupedLyr);
                             await groupedLyrResult;
                             if (groupedLyrResult.Result != null) {
                                 lyrFound = groupedLyrResult.Result;
@@ -150,10 +165,10 @@ namespace MissionAgentReview {
                 return lyrFound;
             }
             void populateAgentList() {
-                if (_lyrAgentTracks == null) return;
+                if (_agentTracksFeatureLayer == null) return;
                 _agentList.Clear();
                 QueuedTask.Run(() => {
-                    FeatureClass fc = _lyrAgentTracks.GetFeatureClass();
+                    FeatureClass fc = _agentTracksFeatureLayer.GetFeatureClass();
                     using (RowCursor rowCur = fc.Search(_agentListQueryFilter)) {
                         while (rowCur.MoveNext()) {
                             using (Row row = rowCur.Current) {
@@ -185,8 +200,8 @@ namespace MissionAgentReview {
                     // Create polylines between tracks, symbolized with arrows
                     /* TODO Creating graphics layer adds and selects it, triggering the TOCSelectionChange event and nulling out the _lyrAgentTracks reference.
                      * Have to wait till after this query to create the graphics layer and add elemnts to it. */
-                    using (RowCursor rowCur = _lyrAgentTracks.Search(agentTracksQF)) {
-                        MapPoint prevPt = null;
+                    using (RowCursor rowCur = _agentTracksFeatureLayer.Search(agentTracksQF)) {
+                        MapPoint prevPt = null; double? prevCourse = null;
                         List<CIMLineGraphic> graphics = new List<CIMLineGraphic>();
                         CIMPointGraphic startGraphic = null, endGraphic = null;
 
@@ -194,6 +209,7 @@ namespace MissionAgentReview {
 
                             using (Feature feat = (Feature)rowCur.Current) {
                                 MapPoint pt = (MapPoint)feat.GetShape();
+                                double? currCourse = (double?)feat[ATTR_COURSE];
 
                                 if (prevPt == null) { // Create start graphic
                                     startGraphic = CreateAgentStartGraphic(pt);
@@ -201,9 +217,15 @@ namespace MissionAgentReview {
 
                                 if (prevPt != null) { // Create a linking graphic
                                     CIMLineGraphic graphic = CreateAgentTrackLinkGraphic(prevPt, pt, symbolRef);
+                                    Dictionary<string, object> attrs = new Dictionary<string, object>(2);
+                                    attrs.Add(ATTR_HEADING_AT_START, prevCourse);
+                                    attrs.Add(ATTR_HEADING_AT_END, currCourse);
+
+                                    graphic.Attributes = attrs;
+
                                     graphics.Add(graphic);
                                 }
-                                prevPt = pt;
+                                prevPt = pt; prevCourse = currCourse;
                             }
                         }
                         System.Diagnostics.Debug.WriteLine($"{graphics.Count} lines created");
@@ -226,6 +248,8 @@ namespace MissionAgentReview {
                             graphicsLayer = LayerFactory.Instance.CreateLayer<ArcGIS.Desktop.Mapping.GraphicsLayer>(gl_param, map);
                         }
                         foreach (CIMLineGraphic graphic in graphics) graphicsLayer?.AddElement(graphic);
+                        // Attributes improperly nulled in graphic elements added to graphics layer.
+                        // Need to use GraphicElement CustomProperties as a workaround.
                         graphicsLayer?.AddElement(startGraphic); Element lastElt = graphicsLayer?.AddElement(endGraphic);
                         graphicsLayer?.SetVisibility(true);
                         // TODO Crash upon exiting Pro if the following line is run with a null or empty parameter:
@@ -275,15 +299,81 @@ namespace MissionAgentReview {
         }
 
         #region LOS Toolset
-        internal static void OnAgentTrackViewshedButtonClick() {
-            System.Diagnostics.Debug.WriteLine("Viewshed Button clicked");
+
+        private bool isAgentTracksGraphicsLayer(Layer lyr) {
+            return (lyr is GraphicsLayer && lyr.Name.StartsWith(AGENTTRACKLYRNAME_PREAMBLE));
         }
-        internal static bool CanOnAgentTrackViewshedButtonClick {
-            get {
-                bool isCanClick = FrameworkApplication.State.Contains("agentTrackResultsAnalysis_state");
-                return isCanClick;
+
+        internal static void OnAgentTrackViewshedButtonClick() {
+            const string checkedState = "sequencingViewshedRunning_state";
+
+            System.Diagnostics.Debug.WriteLine("Viewshed Button clicked");
+            if (FrameworkApplication.State.Contains(checkedState)) { // Stop viewshed
+                FrameworkApplication.State.Deactivate(checkedState);
+                StopViewshedSequence();
+            }
+            else { // Start viewshed
+                FrameworkApplication.State.Activate(checkedState);
+                StartViewshedSequence();
             }
         }
+
+        private static TimeSequencingViewshed _viewshed = null;
+        private static void StartViewshedSequence() {
+            MapView mapView = MapView.Active;
+            ArcGIS.Core.Geometry.SpatialReference sr = mapView.Map.SpatialReference;
+            IReadOnlyCollection<ExploratoryAnalysis> analyses = mapView?.GetExploratoryAnalysisCollection();
+            foreach (ExploratoryAnalysis analysis in analyses) {
+                if (analysis is TimeSequencingViewshed) {
+                    _viewshed = (TimeSequencingViewshed)analysis;
+                    break;
+                }
+            }
+            if (_viewshed == null) {
+                // Create placeholder camera for now
+                Camera cam = new Camera(0, 0, 0, 0, 0, SpatialReferences.WebMercator);
+                _viewshed = new TimeSequencingViewshed(cam, 10, 120, 0, 75);
+                mapView?.AddExploratoryAnalysis(_viewshed);
+            }
+            // Now set observer points 
+            // TODO If more than one agent track layer selected, eventually iterate along all agent points in selected layers
+            // Because this button can only be clicked if a valid layer is selected, we don't need to do any searching
+            GraphicsLayer glyr = (GraphicsLayer)mapView.GetSelectedLayers().FirstOrDefault();
+
+            Task createViewpoints = QueuedTask.Run(() => {
+                IReadOnlyList<GraphicElement> graphics = glyr.GetElementsAsFlattenedList();
+                List<Camera> viewpoints = new List<Camera>();
+
+                foreach (GraphicElement gelt in graphics) {
+                    CIMLineGraphic lineGraphic = (CIMLineGraphic)gelt.GetGraphic();
+                    ArcGIS.Core.Geometry.Polyline line = lineGraphic.Line;
+                    // Generally add the end point of the line as a viewshed spot, but make sure to also add the very starting point
+                    if (gelt == graphics.First()) {
+                        MapPoint ptFirst = line.Points.First();
+                        Camera cam1 = ConstructCamera(ptFirst, sr, (double)lineGraphic.Attributes[ATTR_HEADING_AT_START]);
+                        viewpoints.Add(cam1);
+                    }
+                    // Add the endpoint as viewshed camera
+                    MapPoint pt = line.Points.Last();
+                    Camera cam = ConstructCamera(pt, sr, (double)lineGraphic.Attributes[ATTR_HEADING_AT_END]);
+                    viewpoints.Add(cam);
+                }
+                _viewshed.Locations = viewpoints;
+
+                Camera ConstructCamera(MapPoint pt, ArcGIS.Core.Geometry.SpatialReference srMap, double heading) {
+                    MapPoint ptProj = (MapPoint)GeometryEngine.Instance.Project(pt, srMap);
+                    Camera cam = new Camera(ptProj.X, ptProj.Y, ptProj.Z, 0, heading, srMap);
+                    return cam;
+                }
+            });
+            Task.WaitAll();
+            // And finally, start the sequence
+            //_viewshed?.Start();
+        }
+        private static void StopViewshedSequence() {
+            _viewshed?.Stop();
+        }
+
         #endregion
 
         #region Properties
