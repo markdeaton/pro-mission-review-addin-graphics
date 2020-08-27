@@ -30,7 +30,7 @@ namespace MissionAgentReview {
         /// <summary>
         /// Keeps a record of the location currently showing a viewshed; intended for use in stopping and starting the timer.
         /// </summary>
-        private int _locationIndex = 0;
+        private int _locationIndex = -1;
         private IList<Camera> _locations;
         /// <summary>
         /// The agent trackpoint camera viewpoints at which to sequentially generate viewpoints
@@ -61,10 +61,16 @@ namespace MissionAgentReview {
         }
 
         public void ShowNext() {
-            if (_locationIndex < 0 || _locationIndex >= Locations?.Count) _locationIndex = 0;
+            _locationIndex++;
+            if (_locationIndex < 0 || _locationIndex > Locations?.Count - 1) _locationIndex = 0;
 
             this.SetObserver(Locations?[_locationIndex]);
-            _locationIndex++;
+        }
+        public void ShowPrev() {
+            _locationIndex--;
+            if (_locationIndex > Locations?.Count - 1 || _locationIndex < 0) _locationIndex = Locations.Count - 1;
+
+            this.SetObserver(Locations?[_locationIndex]);
         }
     }
 }

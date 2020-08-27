@@ -309,6 +309,20 @@ namespace MissionAgentReview {
         internal static void OnAgentTrackViewshedNextButtonClick() {
             if (_viewshed?.Locations == null) BuildViewpoints();
             _viewshed?.ShowNext();
+            //Viewshed vs = new Viewshed(
+            //    //new Camera(13046136.17, 4036335.51, 0, 0, 299.0, SpatialReferences.WebMercator),
+            //    new Camera(0, 0, 0, 0, 299, SpatialReferences.WebMercator, CameraViewpoint.LookAt),
+            //    10, 120, 0, 75);
+            //MapView.Active.AddExploratoryAnalysis(vs);
+        }
+        internal static void OnAgentTrackViewshedPrevButtonClick() {
+            if (_viewshed?.Locations == null) BuildViewpoints();
+            _viewshed?.ShowPrev();
+            //Viewshed vs = new Viewshed(
+            //    //new Camera(13046136.17, 4036335.51, 0, 0, 299.0, SpatialReferences.WebMercator),
+            //    new Camera(0, 0, 0, 0, 299, SpatialReferences.WebMercator, CameraViewpoint.LookAt),
+            //    10, 120, 0, 75);
+            //MapView.Active.AddExploratoryAnalysis(vs);
         }
 
         internal static void OnAgentTrackViewshedButtonClick() {
@@ -337,13 +351,12 @@ namespace MissionAgentReview {
                 }
             }
             if (_viewshed == null) {
-                Task createViewshed = QueuedTask.Run(() => {
+                QueuedTask.Run(() => {
                     //Create placeholder camera for now
                    Camera cam = new Camera(0, 0, 0, 0, 0, SpatialReferences.WebMercator);
-                   _viewshed = new TimeSequencingViewshed(cam, 10, 120, 0, 75);
+                   _viewshed = new TimeSequencingViewshed(cam, 30, 120, 0, 75);
                     mapView?.AddExploratoryAnalysis(_viewshed);
-                });
-                createViewshed.Wait();
+                }).Wait();
             }
             // Now set observer points 
             // TODO If more than one agent track layer selected, eventually iterate along all agent points in selected layers
@@ -373,7 +386,15 @@ namespace MissionAgentReview {
 
                 Camera ConstructCamera(MapPoint pt, ArcGIS.Core.Geometry.SpatialReference srMap, double heading) {
                     MapPoint ptProj = (MapPoint)GeometryEngine.Instance.Project(pt, srMap);
-                    Camera cam = new Camera(ptProj.X, ptProj.Y, ptProj.Z, 0, heading, srMap, CameraViewpoint.LookFrom);
+
+                    // Heading adjust to -180 - 180; see https://pro.arcgis.com/en/pro-app/sdk/api-reference/#topic11449.html
+                    double fixedHeading = heading;
+                    if (fixedHeading == 360)
+                        fixedHeading = 0;
+                    else if ((int)(-fixedHeading / -180) == 0) fixedHeading = -fixedHeading % -180;
+                    else fixedHeading = (-fixedHeading % -180) + 180;
+
+                    Camera cam = new Camera(ptProj.X, ptProj.Y, ptProj.Z, -10, fixedHeading, srMap, CameraViewpoint.LookFrom);
                     return cam;
                 }
             });

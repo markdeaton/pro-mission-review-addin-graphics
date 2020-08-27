@@ -79,6 +79,7 @@
         <!-- Line of sight analysis tools -->
         <group id="MissionReview_LOS_Group" caption="Sightline Analysis" appearsOnAddInTab="false">
           <button refID="AgentTracksViewshed_Button" size="large"/>
+          <button refID="AgentTracksViewshedPrev_Button" size="large"/>
           <button refID="AgentTracksViewshedNext_Button" size="large"/>
         </group>
       </groups>
@@ -93,16 +94,23 @@
           </tooltip>
         </comboBox>
         <!-- Viewshed button -->
-        <button id="AgentTracksViewshed_Button" className="MissionAgentReview_Module:OnAgentTrackViewshedButtonClick" caption="Viewshed" loadOnClick="false" 
+        <button id="AgentTracksViewshed_Button" className="MissionAgentReview_Module:OnAgentTrackViewshedButtonClick" caption="Viewshed Sequence" loadOnClick="false" 
                 condition="LOSToolsEnabled_Condition" checkedCondition="SequencingViewshedRunning_Condition"
-                largeImage="Images\GenericButtonGreen32.png" smallImage="Images\GenericButtonGreen16.png">
+                largeImage="Images\viewshed_play.png" smallImage="Images\viewshed_play_16.png">
           <tooltip>Generate a viewshed for selected agents' tracks<disabledText>Select one or more agent track line result layers</disabledText></tooltip>
         </button>
-        <button id="AgentTracksViewshedNext_Button" className="MissionAgentReview_Module:OnAgentTrackViewshedNextButtonClick" caption="> Next Viewshed >" loadOnClick="false"
+        <button id="AgentTracksViewshedNext_Button" className="MissionAgentReview_Module:OnAgentTrackViewshedNextButtonClick" caption="Next Viewshed" loadOnClick="false"
                 condition="ViewshedNextEnabled_Condition" 
-                largeImage="Images\GenericButtonGreen32.png" smallImage="Images\GenericButtonGreen16.png">
+                largeImage="Images\viewshed_next_32.png" smallImage="Images\viewshed_next_16.png">
           <tooltip>
             Generate a viewshed for next sequence in selected agents' tracks<disabledText>Select one or more agent track line result layers</disabledText>
+          </tooltip>
+        </button>
+        <button id="AgentTracksViewshedPrev_Button" className="MissionAgentReview_Module:OnAgentTrackViewshedPrevButtonClick" caption="Previous Viewshed" loadOnClick="false"
+                condition="ViewshedNextEnabled_Condition"
+                largeImage="Images\viewshed_prev_32.png" smallImage="Images\viewshed_prev_16.png">
+          <tooltip>
+            Generate a viewshed for previous sequence in selected agents' tracks<disabledText>Select one or more agent track line result layers</disabledText>
           </tooltip>
         </button>
       </controls>

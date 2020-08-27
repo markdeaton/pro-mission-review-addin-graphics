@@ -137,6 +137,26 @@
     <AddInContent Include="DarkImages\GenericButtonGreen16.png" />
     <AddInContent Include="DarkImages\GenericButtonGreen32.png" />
   </ItemGroup>
+  <ItemGroup>
+    <AddInContent Include="Images\viewshed_next_16.png" />
+    <AddInContent Include="Images\viewshed_next_32.png" />
+    <AddInContent Include="Images\viewshed_prev_16.png" />
+    <AddInContent Include="Images\viewshed_prev_32.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <AddInContent Include="DarkImages\viewshed_next_16.png" />
+    <AddInContent Include="DarkImages\viewshed_next_32.png" />
+    <AddInContent Include="DarkImages\viewshed_prev_16.png" />
+    <AddInContent Include="DarkImages\viewshed_prev_32.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <AddInContent Include="DarkImages\viewshed_play_16.png" />
+    <AddInContent Include="DarkImages\viewshed_play_32.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <AddInContent Include="Images\viewshed_play_16.png" />
+    <AddInContent Include="Images\viewshed_play_32.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!--
   PackageAction can be:
