@@ -354,7 +354,7 @@ namespace MissionAgentReview {
                 QueuedTask.Run(() => {
                     //Create placeholder camera for now
                    Camera cam = new Camera(0, 0, 0, 0, 0, SpatialReferences.WebMercator);
-                   _viewshed = new TimeSequencingViewshed(cam, 30, 120, 0, 75);
+                   _viewshed = new TimeSequencingViewshed(cam, 30, 120, 1, 75);
                     mapView?.AddExploratoryAnalysis(_viewshed);
                 }).Wait();
             }
