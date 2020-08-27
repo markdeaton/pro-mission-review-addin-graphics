@@ -1,9 +1,7 @@
 ﻿using ArcGIS.Core.CIM;
 using ArcGIS.Core.Data;
-using ArcGIS.Core.Data.UtilityNetwork.Trace;
 using ArcGIS.Core.Events;
 using ArcGIS.Core.Geometry;
-using ArcGIS.Core.Internal.CIM;
 using ArcGIS.Desktop.Editing;
 using ArcGIS.Desktop.Framework;
 using ArcGIS.Desktop.Framework.Contracts;
@@ -12,14 +10,10 @@ using ArcGIS.Desktop.Layouts;
 using ArcGIS.Desktop.Mapping;
 using ArcGIS.Desktop.Mapping.Events;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.Drawing.Text;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Timers;
-using System.Windows.Media;
 using Field = ArcGIS.Core.Data.Field;
 using QueryFilter = ArcGIS.Core.Data.QueryFilter;
 
@@ -247,10 +241,18 @@ namespace MissionAgentReview {
                             GraphicsLayerCreationParams gl_param = new GraphicsLayerCreationParams() { Name = graphicsLayerName };
                             graphicsLayer = LayerFactory.Instance.CreateLayer<ArcGIS.Desktop.Mapping.GraphicsLayer>(gl_param, map);
                         }
-                        foreach (CIMLineGraphic graphic in graphics) graphicsLayer?.AddElement(graphic);
+                        foreach (CIMLineGraphic graphic in graphics) {
+                            GraphicElement elt = graphicsLayer?.AddElement(graphic);
+                            if (graphic.Attributes.ContainsKey(ATTR_HEADING_AT_START))
+                                elt.SetCustomProperty(ATTR_HEADING_AT_START, graphic.Attributes[ATTR_HEADING_AT_START].ToString());
+                            if (graphic.Attributes.ContainsKey(ATTR_HEADING_AT_END))
+                                elt.SetCustomProperty(ATTR_HEADING_AT_END, graphic.Attributes[ATTR_HEADING_AT_END].ToString());
+                         }
+                        
                         // Attributes improperly nulled in graphic elements added to graphics layer.
                         // Need to use GraphicElement CustomProperties as a workaround.
                         graphicsLayer?.AddElement(startGraphic); Element lastElt = graphicsLayer?.AddElement(endGraphic);
+                        
                         graphicsLayer?.SetVisibility(true);
                         // TODO Crash upon exiting Pro if the following line is run with a null or empty parameter:
                         //graphicsLayer?.UnSelectElements(new List<Element>() { lastElt });
@@ -304,6 +306,11 @@ namespace MissionAgentReview {
             return (lyr is GraphicsLayer && lyr.Name.StartsWith(AGENTTRACKLYRNAME_PREAMBLE));
         }
 
+        internal static void OnAgentTrackViewshedNextButtonClick() {
+            if (_viewshed?.Locations == null) BuildViewpoints();
+            _viewshed?.ShowNext();
+        }
+
         internal static void OnAgentTrackViewshedButtonClick() {
             const string checkedState = "sequencingViewshedRunning_state";
 
@@ -319,7 +326,7 @@ namespace MissionAgentReview {
         }
 
         private static TimeSequencingViewshed _viewshed = null;
-        private static void StartViewshedSequence() {
+        private static void BuildViewpoints() {
             MapView mapView = MapView.Active;
             ArcGIS.Core.Geometry.SpatialReference sr = mapView.Map.SpatialReference;
             IReadOnlyCollection<ExploratoryAnalysis> analyses = mapView?.GetExploratoryAnalysisCollection();
@@ -330,10 +337,13 @@ namespace MissionAgentReview {
                 }
             }
             if (_viewshed == null) {
-                // Create placeholder camera for now
-                Camera cam = new Camera(0, 0, 0, 0, 0, SpatialReferences.WebMercator);
-                _viewshed = new TimeSequencingViewshed(cam, 10, 120, 0, 75);
-                mapView?.AddExploratoryAnalysis(_viewshed);
+                Task createViewshed = QueuedTask.Run(() => {
+                    //Create placeholder camera for now
+                   Camera cam = new Camera(0, 0, 0, 0, 0, SpatialReferences.WebMercator);
+                   _viewshed = new TimeSequencingViewshed(cam, 10, 120, 0, 75);
+                    mapView?.AddExploratoryAnalysis(_viewshed);
+                });
+                createViewshed.Wait();
             }
             // Now set observer points 
             // TODO If more than one agent track layer selected, eventually iterate along all agent points in selected layers
@@ -345,30 +355,34 @@ namespace MissionAgentReview {
                 List<Camera> viewpoints = new List<Camera>();
 
                 foreach (GraphicElement gelt in graphics) {
+                    if (!(gelt.GetGraphic() is CIMLineGraphic)) break;
                     CIMLineGraphic lineGraphic = (CIMLineGraphic)gelt.GetGraphic();
                     ArcGIS.Core.Geometry.Polyline line = lineGraphic.Line;
                     // Generally add the end point of the line as a viewshed spot, but make sure to also add the very starting point
-                    if (gelt == graphics.First()) {
+                    if (gelt == graphics.First() && !String.IsNullOrEmpty(gelt.GetCustomProperty(ATTR_HEADING_AT_START))) {
                         MapPoint ptFirst = line.Points.First();
-                        Camera cam1 = ConstructCamera(ptFirst, sr, (double)lineGraphic.Attributes[ATTR_HEADING_AT_START]);
+                        Camera cam1 = ConstructCamera(ptFirst, sr, Double.Parse(gelt.GetCustomProperty(ATTR_HEADING_AT_START)));
                         viewpoints.Add(cam1);
                     }
                     // Add the endpoint as viewshed camera
                     MapPoint pt = line.Points.Last();
-                    Camera cam = ConstructCamera(pt, sr, (double)lineGraphic.Attributes[ATTR_HEADING_AT_END]);
+                    Camera cam = ConstructCamera(pt, sr, Double.Parse(gelt.GetCustomProperty(ATTR_HEADING_AT_END)));
                     viewpoints.Add(cam);
                 }
                 _viewshed.Locations = viewpoints;
 
                 Camera ConstructCamera(MapPoint pt, ArcGIS.Core.Geometry.SpatialReference srMap, double heading) {
                     MapPoint ptProj = (MapPoint)GeometryEngine.Instance.Project(pt, srMap);
-                    Camera cam = new Camera(ptProj.X, ptProj.Y, ptProj.Z, 0, heading, srMap);
+                    Camera cam = new Camera(ptProj.X, ptProj.Y, ptProj.Z, 0, heading, srMap, CameraViewpoint.LookFrom);
                     return cam;
                 }
             });
-            Task.WaitAll();
+            createViewpoints.Wait();
+        }
+        private static void StartViewshedSequence() {
+            if (_viewshed?.Locations == null) BuildViewpoints();
             // And finally, start the sequence
-            //_viewshed?.Start();
+            _viewshed?.Start();
         }
         private static void StopViewshedSequence() {
             _viewshed?.Stop();

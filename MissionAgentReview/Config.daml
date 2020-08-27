@@ -37,6 +37,22 @@
     <insertCondition id="SequencingViewshedRunning_Condition" caption="Is a sequencing viewshed currently running?">
       <state id="sequencingViewshedRunning_state"/>
     </insertCondition>
+    <insertCondition id="ViewshedNextEnabled_Condition" caption="Next viewshed button enabled?">
+      <and>
+        <not>
+          <state id="sequencingViewshedRunning_state"/>
+        </not>
+        <state id="onlyAgentTrackGraphicsLyrsAreSelected_state"/>
+        <and>
+          <!-- Scene view active state taken from ConditionQuery community sample -->
+          <state id="esri_mapping_mapPane" />
+          <or>
+            <state id="esri_mapping_mapViewingMode3DPerspectiveState" />
+            <state id="esri_mapping_mapViewingMode3DGlobeState" />
+          </or>
+        </and>
+      </and>
+    </insertCondition>
   </conditions>
   <modules>
     <insertModule id="MissionAgentReview_Module" className="Module1" autoLoad="true" caption="Module1">
@@ -63,6 +79,7 @@
         <!-- Line of sight analysis tools -->
         <group id="MissionReview_LOS_Group" caption="Sightline Analysis" appearsOnAddInTab="false">
           <button refID="AgentTracksViewshed_Button" size="large"/>
+          <button refID="AgentTracksViewshedNext_Button" size="large"/>
         </group>
       </groups>
       <controls>
@@ -80,6 +97,13 @@
                 condition="LOSToolsEnabled_Condition" checkedCondition="SequencingViewshedRunning_Condition"
                 largeImage="Images\GenericButtonGreen32.png" smallImage="Images\GenericButtonGreen16.png">
           <tooltip>Generate a viewshed for selected agents' tracks<disabledText>Select one or more agent track line result layers</disabledText></tooltip>
+        </button>
+        <button id="AgentTracksViewshedNext_Button" className="MissionAgentReview_Module:OnAgentTrackViewshedNextButtonClick" caption="> Next Viewshed >" loadOnClick="false"
+                condition="ViewshedNextEnabled_Condition" 
+                largeImage="Images\GenericButtonGreen32.png" smallImage="Images\GenericButtonGreen16.png">
+          <tooltip>
+            Generate a viewshed for next sequence in selected agents' tracks<disabledText>Select one or more agent track line result layers</disabledText>
+          </tooltip>
         </button>
       </controls>
     </insertModule>

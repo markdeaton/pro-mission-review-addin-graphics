@@ -55,9 +55,16 @@ namespace MissionAgentReview {
 
         private void OnIntervalElapsed(Object source, System.Timers.ElapsedEventArgs e) {
             if (_locationIndex < 0 || _locationIndex >= Locations?.Count) _locationIndex = 0;
-            else _locationIndex++;
 
-            SetObserver(Locations?[_locationIndex]);
+            this.SetObserver(Locations?[_locationIndex]);
+            _locationIndex++;
+        }
+
+        public void ShowNext() {
+            if (_locationIndex < 0 || _locationIndex >= Locations?.Count) _locationIndex = 0;
+
+            this.SetObserver(Locations?[_locationIndex]);
+            _locationIndex++;
         }
     }
 }
