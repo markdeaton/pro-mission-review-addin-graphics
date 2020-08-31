@@ -280,14 +280,33 @@ namespace MissionAgentReview {
                 Random rand = new Random();
                 double r = Math.Floor(rand.NextDouble() * 256.0); double g = Math.Floor(rand.NextDouble() * 256.0); double b = Math.Floor(rand.NextDouble() * 256.0);
                 CIMColor color = ColorFactory.Instance.CreateRGBColor(r, g, b);
-                CIMMarker markerTriangle = SymbolFactory.Instance.ConstructMarker(color, 8, SimpleMarkerStyle.Triangle);
+                /*CIMMarker markerTriangle = SymbolFactory.Instance.ConstructMarker(color, 8, SimpleMarkerStyle.Triangle);
                 markerTriangle.Rotation = -90; // or -90
-                markerTriangle.MarkerPlacement = new CIMMarkerPlacementOnLine() { AngleToLine = true, RelativeTo = PlacementOnLineRelativeTo.LineEnd };
-
+                markerTriangle.MarkerPlacement = new CIMMarkerPlacementOnLine() { AngleToLine = true, RelativeTo = PlacementOnLineRelativeTo.LineEnd };*/
                 var lineSymbolWithArrow = new CIMLineSymbol() {
-                    SymbolLayers = new CIMSymbolLayer[2] {
-                            markerTriangle, SymbolFactory.Instance.ConstructStroke(color, 2)
+                    SymbolLayers = new CIMSymbolLayer[] {
+                        //markerTriangle,
+                        //SymbolFactory.Instance.ConstructStroke(color, 2),
+                        new CIMSolidStroke() {
+                            Color = color,
+                            Width = 3, 
+                            CapStyle = LineCapStyle.Square,
+                            JoinStyle = LineJoinStyle.Miter,
+                            MiterLimit = 5,
+                            LineStyle3D = Simple3DLineStyle.Tube,
+                            Enable = true,
+                            Effects = new CIMGeometricEffect[] {
+                                new CIMGeometricEffectArrow() {
+                                    ArrowType = GeometricEffectArrowType.Block,
+                                    Width = 3
+                                },
+                                new CIMGeometricEffectScale() {
+                                    XScaleFactor = 0.90,
+                                    YScaleFactor = 0.90
+                                }
+                            }
                         }
+                    }
                 };
                 return lineSymbolWithArrow;
             }
@@ -309,20 +328,10 @@ namespace MissionAgentReview {
         internal static void OnAgentTrackViewshedNextButtonClick() {
             if (_viewshed?.Locations == null) BuildViewpoints();
             _viewshed?.ShowNext();
-            //Viewshed vs = new Viewshed(
-            //    //new Camera(13046136.17, 4036335.51, 0, 0, 299.0, SpatialReferences.WebMercator),
-            //    new Camera(0, 0, 0, 0, 299, SpatialReferences.WebMercator, CameraViewpoint.LookAt),
-            //    10, 120, 0, 75);
-            //MapView.Active.AddExploratoryAnalysis(vs);
         }
         internal static void OnAgentTrackViewshedPrevButtonClick() {
             if (_viewshed?.Locations == null) BuildViewpoints();
             _viewshed?.ShowPrev();
-            //Viewshed vs = new Viewshed(
-            //    //new Camera(13046136.17, 4036335.51, 0, 0, 299.0, SpatialReferences.WebMercator),
-            //    new Camera(0, 0, 0, 0, 299, SpatialReferences.WebMercator, CameraViewpoint.LookAt),
-            //    10, 120, 0, 75);
-            //MapView.Active.AddExploratoryAnalysis(vs);
         }
 
         internal static void OnAgentTrackViewshedButtonClick() {
@@ -353,8 +362,8 @@ namespace MissionAgentReview {
             if (_viewshed == null) {
                 QueuedTask.Run(() => {
                     //Create placeholder camera for now
-                   Camera cam = new Camera(0, 0, 0, 0, 0, SpatialReferences.WebMercator);
-                   _viewshed = new TimeSequencingViewshed(cam, 30, 120, 1, 75);
+                    Camera cam = new Camera(0, 0, 0, 0, 0, SpatialReferences.WebMercator);
+                    _viewshed = new TimeSequencingViewshed(cam, 30, 120, 1, 75);
                     mapView?.AddExploratoryAnalysis(_viewshed);
                 }).Wait();
             }
@@ -363,7 +372,7 @@ namespace MissionAgentReview {
             // Because this button can only be clicked if a valid layer is selected, we don't need to do any searching
             GraphicsLayer glyr = (GraphicsLayer)mapView.GetSelectedLayers().FirstOrDefault();
 
-            Task createViewpoints = QueuedTask.Run(() => {
+            QueuedTask.Run(() => {
                 IReadOnlyList<GraphicElement> graphics = glyr.GetElementsAsFlattenedList();
                 List<Camera> viewpoints = new List<Camera>();
 
@@ -397,8 +406,7 @@ namespace MissionAgentReview {
                     Camera cam = new Camera(ptProj.X, ptProj.Y, ptProj.Z, -10, fixedHeading, srMap, CameraViewpoint.LookFrom);
                     return cam;
                 }
-            });
-            createViewpoints.Wait();
+            }).Wait();
         }
         private static void StartViewshedSequence() {
             if (_viewshed?.Locations == null) BuildViewpoints();

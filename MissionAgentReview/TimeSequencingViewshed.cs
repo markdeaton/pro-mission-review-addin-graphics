@@ -54,23 +54,29 @@ namespace MissionAgentReview {
         }
 
         private void OnIntervalElapsed(Object source, System.Timers.ElapsedEventArgs e) {
-            if (_locationIndex < 0 || _locationIndex >= Locations?.Count) _locationIndex = 0;
-
-            this.SetObserver(Locations?[_locationIndex]);
-            _locationIndex++;
+            ShowNext();
         }
 
         public void ShowNext() {
-            _locationIndex++;
-            if (_locationIndex < 0 || _locationIndex > Locations?.Count - 1) _locationIndex = 0;
+            try {
+                _locationIndex++;
+                if (_locationIndex < 0 || _locationIndex > Locations?.Count - 1) _locationIndex = 0;
 
-            this.SetObserver(Locations?[_locationIndex]);
+                this.SetObserver(Locations?[_locationIndex]);
+            } catch (InvalidOperationException e) {
+                System.Diagnostics.Debug.WriteLine($"Error in viewshed ShowNext: {e}");
+                Stop();
+            }
         }
         public void ShowPrev() {
-            _locationIndex--;
-            if (_locationIndex > Locations?.Count - 1 || _locationIndex < 0) _locationIndex = Locations.Count - 1;
+            try {
+                _locationIndex--;
+                if (_locationIndex > Locations?.Count - 1 || _locationIndex < 0) _locationIndex = Locations.Count - 1;
 
-            this.SetObserver(Locations?[_locationIndex]);
+                this.SetObserver(Locations?[_locationIndex]);
+            } catch (InvalidOperationException e) {
+                System.Diagnostics.Debug.WriteLine($"Error in viewshed ShowPrev: {e}");
+            }
         }
     }
 }
