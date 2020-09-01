@@ -1,5 +1,6 @@
 ﻿using ArcGIS.Core.Geometry;
 using ArcGIS.Desktop.Mapping;
+using MissionAgentReview.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,6 +17,10 @@ namespace MissionAgentReview {
                                : base(observer, verticalAngle, horizontalAngle, minimumDistance, maximumDistance) {
             _timer.Elapsed += OnIntervalElapsed;
          }
+        public TimeSequencingViewshed(IList<Camera> locations, int idxLocation, double verticalAngle, double horizontalAngle, double minimumDistance, double maximumDistance) 
+                                : base(locations[idxLocation], verticalAngle, horizontalAngle, minimumDistance, maximumDistance) {
+            _locationIndex = idxLocation;
+        }
 
         private Timer _timer = new Timer() {  AutoReset = true, Interval = 2000 };
         /// <summary>
@@ -64,8 +69,8 @@ namespace MissionAgentReview {
 
                 this.SetObserver(Locations?[_locationIndex]);
             } catch (InvalidOperationException e) {
-                System.Diagnostics.Debug.WriteLine($"Error in viewshed ShowNext: {e}");
                 Stop();
+                throw new TimeSequencingViewshedInvalidException("Error in viewshed ShowNext", e, _locations, _locationIndex);
             }
         }
         public void ShowPrev() {
@@ -75,7 +80,8 @@ namespace MissionAgentReview {
 
                 this.SetObserver(Locations?[_locationIndex]);
             } catch (InvalidOperationException e) {
-                System.Diagnostics.Debug.WriteLine($"Error in viewshed ShowPrev: {e}");
+                Stop();
+                throw new TimeSequencingViewshedInvalidException("Error in viewshed ShowPrev", e, _locations, _locationIndex);
             }
         }
     }

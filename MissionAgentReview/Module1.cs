@@ -9,6 +9,7 @@ using ArcGIS.Desktop.Framework.Threading.Tasks;
 using ArcGIS.Desktop.Layouts;
 using ArcGIS.Desktop.Mapping;
 using ArcGIS.Desktop.Mapping.Events;
+using MissionAgentReview.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -327,11 +328,31 @@ namespace MissionAgentReview {
 
         internal static void OnAgentTrackViewshedNextButtonClick() {
             if (_viewshed?.Locations == null) BuildViewpoints();
-            _viewshed?.ShowNext();
+            try {
+                _viewshed?.ShowNext();
+            } catch (TimeSequencingViewshedInvalidException e) {
+                // The viewshed has probably been removed through the GUI. But we can recreate it.
+                TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(e.Viewpoints, e.CurrentViewpointIndex, VERT_ANGLE, 
+                    HORIZ_ANGLE, MIN_DIST, MAX_DIST);
+                MapView mapView = MapView.Active;
+                mapView?.RemoveExploratoryAnalysis(_viewshed);
+                _viewshed = newViewshed;
+                mapView?.AddExploratoryAnalysis(_viewshed);
+            }
         }
         internal static void OnAgentTrackViewshedPrevButtonClick() {
             if (_viewshed?.Locations == null) BuildViewpoints();
-            _viewshed?.ShowPrev();
+            try {
+                _viewshed?.ShowPrev();
+            } catch (TimeSequencingViewshedInvalidException e) {
+                // The viewshed has probably been removed through the GUI. But we can recreate it.
+                TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(e.Viewpoints, e.CurrentViewpointIndex, VERT_ANGLE,
+                    HORIZ_ANGLE, MIN_DIST, MAX_DIST);
+                MapView mapView = MapView.Active;
+                mapView?.RemoveExploratoryAnalysis(_viewshed);
+                _viewshed = newViewshed;
+                mapView?.AddExploratoryAnalysis(_viewshed);
+            }
         }
 
         internal static void OnAgentTrackViewshedButtonClick() {
@@ -348,6 +369,11 @@ namespace MissionAgentReview {
             }
         }
 
+        private const double HORIZ_ANGLE = 120;
+        private const double VERT_ANGLE = 30;
+        private const double MIN_DIST = 1;
+        private const double MAX_DIST = 75;
+
         private static TimeSequencingViewshed _viewshed = null;
         private static void BuildViewpoints() {
             MapView mapView = MapView.Active;
@@ -363,7 +389,7 @@ namespace MissionAgentReview {
                 QueuedTask.Run(() => {
                     //Create placeholder camera for now
                     Camera cam = new Camera(0, 0, 0, 0, 0, SpatialReferences.WebMercator);
-                    _viewshed = new TimeSequencingViewshed(cam, 30, 120, 1, 75);
+                    _viewshed = new TimeSequencingViewshed(cam, VERT_ANGLE, HORIZ_ANGLE, MIN_DIST, MAX_DIST);
                     mapView?.AddExploratoryAnalysis(_viewshed);
                 }).Wait();
             }
@@ -379,7 +405,7 @@ namespace MissionAgentReview {
                 foreach (GraphicElement gelt in graphics) {
                     if (!(gelt.GetGraphic() is CIMLineGraphic)) break;
                     CIMLineGraphic lineGraphic = (CIMLineGraphic)gelt.GetGraphic();
-                    ArcGIS.Core.Geometry.Polyline line = lineGraphic.Line;
+                    Polyline line = lineGraphic.Line;
                     // Generally add the end point of the line as a viewshed spot, but make sure to also add the very starting point
                     if (gelt == graphics.First() && !String.IsNullOrEmpty(gelt.GetCustomProperty(ATTR_HEADING_AT_START))) {
                         MapPoint ptFirst = line.Points.First();
