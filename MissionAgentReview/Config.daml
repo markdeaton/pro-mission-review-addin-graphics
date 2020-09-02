@@ -94,7 +94,7 @@
           </tooltip>
         </comboBox>
         <!-- Viewshed button -->
-        <button id="AgentTracksViewshed_Button" className="MissionAgentReview_Module:OnAgentTrackViewshedButtonClick" caption="Viewshed Sequence" loadOnClick="false" 
+        <button id="AgentTracksViewshed_Button" className="MissionAgentReview_Module:OnAgentTrackAnimateViewshedButtonClick" caption="Viewshed Sequence" loadOnClick="false" 
                 condition="LOSToolsEnabled_Condition" checkedCondition="SequencingViewshedRunning_Condition"
                 largeImage="Images\viewshed_play.png" smallImage="Images\viewshed_play_16.png">
           <tooltip>Generate a viewshed for selected agents' tracks<disabledText>Select one or more agent track line result layers</disabledText></tooltip>

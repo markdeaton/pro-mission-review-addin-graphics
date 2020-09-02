@@ -327,7 +327,7 @@ namespace MissionAgentReview {
         }
 
         internal static void OnAgentTrackViewshedNextButtonClick() {
-            if (_viewshed?.Locations == null) BuildViewpoints();
+            if (_viewshed?.Viewpoints == null) BuildViewpoints();
             try {
                 _viewshed?.ShowNext();
             } catch (TimeSequencingViewshedInvalidException e) {
@@ -335,13 +335,13 @@ namespace MissionAgentReview {
                 TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(e.Viewpoints, e.CurrentViewpointIndex, VERT_ANGLE, 
                     HORIZ_ANGLE, MIN_DIST, MAX_DIST);
                 MapView mapView = MapView.Active;
-                mapView?.RemoveExploratoryAnalysis(_viewshed);
+                mapView?.RemoveExploratoryAnalysis(_viewshed); _viewshed.Dispose();
                 _viewshed = newViewshed;
                 mapView?.AddExploratoryAnalysis(_viewshed);
             }
         }
         internal static void OnAgentTrackViewshedPrevButtonClick() {
-            if (_viewshed?.Locations == null) BuildViewpoints();
+            if (_viewshed?.Viewpoints == null) BuildViewpoints();
             try {
                 _viewshed?.ShowPrev();
             } catch (TimeSequencingViewshedInvalidException e) {
@@ -349,23 +349,35 @@ namespace MissionAgentReview {
                 TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(e.Viewpoints, e.CurrentViewpointIndex, VERT_ANGLE,
                     HORIZ_ANGLE, MIN_DIST, MAX_DIST);
                 MapView mapView = MapView.Active;
-                mapView?.RemoveExploratoryAnalysis(_viewshed);
+                mapView?.RemoveExploratoryAnalysis(_viewshed); 
+                _viewshed.Dispose();
                 _viewshed = newViewshed;
                 mapView?.AddExploratoryAnalysis(_viewshed);
             }
         }
 
-        internal static void OnAgentTrackViewshedButtonClick() {
-            const string checkedState = "sequencingViewshedRunning_state";
+        internal static void OnAgentTrackAnimateViewshedButtonClick() {
+            const string CHECKED_STATE = "sequencingViewshedRunning_state";
 
             System.Diagnostics.Debug.WriteLine("Viewshed Button clicked");
-            if (FrameworkApplication.State.Contains(checkedState)) { // Stop viewshed
-                FrameworkApplication.State.Deactivate(checkedState);
-                StopViewshedSequence();
-            }
-            else { // Start viewshed
-                FrameworkApplication.State.Activate(checkedState);
-                StartViewshedSequence();
+            if (FrameworkApplication.State.Contains(CHECKED_STATE)) { // Stop viewshed
+                                                                      //FrameworkApplication.State.Deactivate(CHECKED_STATE);
+                _viewshed?.Stop();
+            } else { // Start viewshed
+                   //FrameworkApplication.State.Activate(CHECKED_STATE);
+                // Has the viewshed been removed through other GUI means and is now invalid?
+                if (_viewshed != null && !_viewshed.IsValidAnalysisLayer) {
+                    TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(_viewshed.Viewpoints, _viewshed.ViewpointIndex, VERT_ANGLE,
+                        HORIZ_ANGLE, MIN_DIST, MAX_DIST);
+                    MapView mapView = MapView.Active;
+                    mapView?.RemoveExploratoryAnalysis(_viewshed); 
+                    _viewshed.Dispose();
+                    _viewshed = newViewshed;
+                    mapView?.AddExploratoryAnalysis(_viewshed);
+                }
+                if (_viewshed?.Viewpoints == null) BuildViewpoints();
+                // And finally, start the sequence
+                _viewshed?.Start();
             }
         }
 
@@ -417,7 +429,7 @@ namespace MissionAgentReview {
                     Camera cam = ConstructCamera(pt, sr, Double.Parse(gelt.GetCustomProperty(ATTR_HEADING_AT_END)));
                     viewpoints.Add(cam);
                 }
-                _viewshed.Locations = viewpoints;
+                _viewshed.Viewpoints = viewpoints;
 
                 Camera ConstructCamera(MapPoint pt, ArcGIS.Core.Geometry.SpatialReference srMap, double heading) {
                     MapPoint ptProj = (MapPoint)GeometryEngine.Instance.Project(pt, srMap);
@@ -433,14 +445,6 @@ namespace MissionAgentReview {
                     return cam;
                 }
             }).Wait();
-        }
-        private static void StartViewshedSequence() {
-            if (_viewshed?.Locations == null) BuildViewpoints();
-            // And finally, start the sequence
-            _viewshed?.Start();
-        }
-        private static void StopViewshedSequence() {
-            _viewshed?.Stop();
         }
 
         #endregion

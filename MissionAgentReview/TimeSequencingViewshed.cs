@@ -1,4 +1,6 @@
 ﻿using ArcGIS.Core.Geometry;
+using ArcGIS.Desktop.Framework;
+using ArcGIS.Desktop.Framework.Dialogs;
 using ArcGIS.Desktop.Mapping;
 using MissionAgentReview.Exceptions;
 using System;
@@ -9,20 +11,29 @@ using System.Threading.Tasks;
 using System.Timers;
 
 namespace MissionAgentReview {
-    public class TimeSequencingViewshed : Viewshed {
-        public TimeSequencingViewshed(TimeSequencingViewshed tsv): base(tsv) {
+    public class TimeSequencingViewshed : Viewshed, IDisposable {
+        public TimeSequencingViewshed(TimeSequencingViewshed tsv) : base(tsv) {
             _timer.Elapsed += OnIntervalElapsed;
         }
-        public TimeSequencingViewshed(Camera observer, double verticalAngle, double horizontalAngle, double minimumDistance, double maximumDistance) 
+        public TimeSequencingViewshed(Camera observer, double verticalAngle, double horizontalAngle, double minimumDistance, double maximumDistance)
                                : base(observer, verticalAngle, horizontalAngle, minimumDistance, maximumDistance) {
             _timer.Elapsed += OnIntervalElapsed;
-         }
-        public TimeSequencingViewshed(IList<Camera> locations, int idxLocation, double verticalAngle, double horizontalAngle, double minimumDistance, double maximumDistance) 
+        }
+        public TimeSequencingViewshed(IList<Camera> locations, int idxLocation, double verticalAngle, double horizontalAngle, double minimumDistance, double maximumDistance)
                                 : base(locations[idxLocation], verticalAngle, horizontalAngle, minimumDistance, maximumDistance) {
-            _locationIndex = idxLocation;
+            _viewpointIndex = idxLocation;
         }
 
-        private Timer _timer = new Timer() {  AutoReset = true, Interval = 2000 };
+        public bool IsValidAnalysisLayer {
+            get { return this.MapView != null && this.MapView.GetExploratoryAnalysisCollection().Contains(this); }
+        }
+
+        private bool _disposed = false;
+/*        public bool Disposed {
+            get { return _disposed; }
+        }*/
+
+        private Timer _timer = new Timer() { AutoReset = true, Interval = 2000 };
         /// <summary>
         /// How long he animation will pause with a viewshed analysis at each agent trackpoint
         /// </summary>
@@ -35,54 +46,68 @@ namespace MissionAgentReview {
         /// <summary>
         /// Keeps a record of the location currently showing a viewshed; intended for use in stopping and starting the timer.
         /// </summary>
-        private int _locationIndex = -1;
-        private IList<Camera> _locations;
+        private int _viewpointIndex = -1;
+        private IList<Camera> _viewpoints;
         /// <summary>
         /// The agent trackpoint camera viewpoints at which to sequentially generate viewpoints
         /// </summary>
-        public IList<Camera> Locations {
-            get { return _locations; }
-            set { _locations = value; }
+        public IList<Camera> Viewpoints {
+            get { return _viewpoints; }
+            set { _viewpoints = value; }
         }
-    
+        public int ViewpointIndex {
+            get { return _viewpointIndex; }
+        }
         /// <summary>
         /// Begins animating using the DwellTimeMs property as the interval
         /// </summary>
         public void Start() {
             _timer.Start();
+            FrameworkApplication.State.Activate("sequencingViewshedRunning_state");
         }
         /// <summary>
         /// Stops animating
         /// </summary>
         public void Stop() {
             _timer.Stop();
+            FrameworkApplication.State.Deactivate("sequencingViewshedRunning_state");
         }
 
         private void OnIntervalElapsed(Object source, System.Timers.ElapsedEventArgs e) {
-            ShowNext();
+            try {
+                ShowNext();
+            } catch (TimeSequencingViewshedInvalidException exc) {
+                Stop();
+                Dispose(); _disposed = true;
+                MessageBox.Show("The viewshed analysis was unexpectedly removed from the scene. Please invoke the analysis again.", "Invalid Viewshed Object");
+            }
         }
 
         public void ShowNext() {
             try {
-                _locationIndex++;
-                if (_locationIndex < 0 || _locationIndex > Locations?.Count - 1) _locationIndex = 0;
+                _viewpointIndex++;
+                if (_viewpointIndex < 0 || _viewpointIndex > Viewpoints?.Count - 1) _viewpointIndex = 0;
 
-                this.SetObserver(Locations?[_locationIndex]);
+                this.SetObserver(Viewpoints?[_viewpointIndex]);
             } catch (InvalidOperationException e) {
-                Stop();
-                throw new TimeSequencingViewshedInvalidException("Error in viewshed ShowNext", e, _locations, _locationIndex);
+                throw new TimeSequencingViewshedInvalidException("Error in viewshed ShowNext", e, _viewpoints, _viewpointIndex);
             }
         }
         public void ShowPrev() {
             try {
-                _locationIndex--;
-                if (_locationIndex > Locations?.Count - 1 || _locationIndex < 0) _locationIndex = Locations.Count - 1;
+                _viewpointIndex--;
+                if (_viewpointIndex > Viewpoints?.Count - 1 || _viewpointIndex < 0) _viewpointIndex = Viewpoints.Count - 1;
 
-                this.SetObserver(Locations?[_locationIndex]);
+                this.SetObserver(Viewpoints?[_viewpointIndex]);
             } catch (InvalidOperationException e) {
                 Stop();
-                throw new TimeSequencingViewshedInvalidException("Error in viewshed ShowPrev", e, _locations, _locationIndex);
+                throw new TimeSequencingViewshedInvalidException("Error in viewshed ShowPrev", e, _viewpoints, _viewpointIndex);
             }
+        }
+
+        public void Dispose() {
+            _timer.Close();
+            ((IDisposable)_timer).Dispose();
         }
     }
 }
