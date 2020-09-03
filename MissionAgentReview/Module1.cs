@@ -17,6 +17,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Field = ArcGIS.Core.Data.Field;
 using QueryFilter = ArcGIS.Core.Data.QueryFilter;
+using MissionAgentReview.Extensions;
 
 namespace MissionAgentReview {
     internal class Module1 : Module {
@@ -29,7 +30,7 @@ namespace MissionAgentReview {
         private const string FIELD_AGENTNAME = "created_user";
         private const string FIELD_CREATEDATETIME = "created_date";
         private const string AGENTTRACKLYRNAME_PREAMBLE = "Agent Path: ";
-        private FeatureLayer _agentTracksFeatureLayer;
+        private static FeatureLayer _agentTracksFeatureLayer;
 
         /// <summary>
         /// Graphic attribute to hold the agent's heading at the beginning of a line connector
@@ -93,7 +94,7 @@ namespace MissionAgentReview {
                     // Unfortunately, we can only search by graphic layer type and layer name
                     areOnlyAgentTrackGraphicsLyrsSelected &= isAgentTracksGraphicsLayer(lyr);
 
-                    // look for one that has all the characteristics of a Mission agent tracks layer
+                    // Look for one that has all the characteristics of a Mission agent tracks layer
                     Task<FeatureLayer> lyrFound = isAgentTracksFeatureLayer(lyr);
                     if (_agentTracksFeatureLayer == null && lyrFound.Result != null) {
                         _agentTracksFeatureLayer = lyrFound.Result;
@@ -117,7 +118,6 @@ namespace MissionAgentReview {
                 }
             });
 
-            //throw new NotImplementedException();
             // Find and return a layer matching specs for Agent Tracks layer. Return null if not found.
             async Task<FeatureLayer> isAgentTracksFeatureLayer(Layer lyr) {
                 FeatureLayer lyrFound = null;
@@ -163,8 +163,9 @@ namespace MissionAgentReview {
                 if (_agentTracksFeatureLayer == null) return;
                 _agentList.Clear();
                 QueuedTask.Run(() => {
-                    FeatureClass fc = _agentTracksFeatureLayer.GetFeatureClass();
-                    using (RowCursor rowCur = fc.Search(_agentListQueryFilter)) {
+
+                    // Query the feature *layer* to take into account any query definitions on the layer
+                    using (RowCursor rowCur = _agentTracksFeatureLayer.Search(_agentListQueryFilter)) {
                         while (rowCur.MoveNext()) {
                             using (Row row = rowCur.Current) {
                                 _agentList.Add(row[FIELD_AGENTNAME].ToString()); // Assumes only one field in the query filter
@@ -177,7 +178,7 @@ namespace MissionAgentReview {
             }
         }
 
-        private void OnAgentSelected(string agentName) {
+        private static void OnAgentSelected(string agentName) {
             ProgressorSource ps = new ProgressorSource("Finding agent path...", false);
             QueuedTask.Run<object>(() => {
                 CIMSymbolReference symbolRef = ArrowSym().MakeSymbolReference();
@@ -190,14 +191,13 @@ namespace MissionAgentReview {
 
                 Map map = MapView.Active.Map;
                 if (map.MapType == MapType.Map || map.MapType == MapType.Scene) {
-                    string graphicsLayerName = $"{AGENTTRACKLYRNAME_PREAMBLE}{agentName}";
 
                     // Create polylines between tracks, symbolized with arrows
                     /* TODO Creating graphics layer adds and selects it, triggering the TOCSelectionChange event and nulling out the _lyrAgentTracks reference.
                      * Have to wait till after this query to create the graphics layer and add elemnts to it. */
                     using (RowCursor rowCur = _agentTracksFeatureLayer.Search(agentTracksQF)) {
                         MapPoint prevPt = null; double? prevCourse = null;
-                        List<CIMLineGraphic> graphics = new List<CIMLineGraphic>();
+                        IList<CIMLineGraphic> pathGraphics = new List<CIMLineGraphic>();
                         CIMPointGraphic startGraphic = null, endGraphic = null;
 
                         while (rowCur.MoveNext()) {
@@ -218,12 +218,12 @@ namespace MissionAgentReview {
 
                                     graphic.Attributes = attrs;
 
-                                    graphics.Add(graphic);
+                                    pathGraphics.Add(graphic);
                                 }
                                 prevPt = pt; prevCourse = currCourse;
                             }
                         }
-                        System.Diagnostics.Debug.WriteLine($"{graphics.Count} lines created");
+                        System.Diagnostics.Debug.WriteLine($"{pathGraphics.Count} lines created");
 
                         if (prevPt != null) { // Create end graphic
                             endGraphic = CreateAgentEndGraphic(prevPt);
@@ -232,6 +232,8 @@ namespace MissionAgentReview {
                         // Now that we have our graphics, we need a graphics layer. If it already exists, clear and reuse it; otherwise, create one.
                         GraphicsLayer graphicsLayer = null;
 
+                        string travelDist = pathGraphics.AgentTravelDistance().ToString("F2");
+                        string graphicsLayerName = $"{AGENTTRACKLYRNAME_PREAMBLE}{agentName} ({travelDist} {map.SpatialReference.Unit.Name}s)";
                         IReadOnlyList<Layer> layers = map.FindLayers(graphicsLayerName, true);
                         if (layers.Count > 0 && layers.FirstOrDefault() is GraphicsLayer) { // Use the first one found
                             graphicsLayer = (GraphicsLayer)layers.FirstOrDefault();
@@ -242,7 +244,7 @@ namespace MissionAgentReview {
                             GraphicsLayerCreationParams gl_param = new GraphicsLayerCreationParams() { Name = graphicsLayerName };
                             graphicsLayer = LayerFactory.Instance.CreateLayer<ArcGIS.Desktop.Mapping.GraphicsLayer>(gl_param, map);
                         }
-                        foreach (CIMLineGraphic graphic in graphics) {
+                        foreach (CIMLineGraphic graphic in pathGraphics) {
                             GraphicElement elt = graphicsLayer?.AddElement(graphic);
                             if (graphic.Attributes.ContainsKey(ATTR_HEADING_AT_START))
                                 elt.SetCustomProperty(ATTR_HEADING_AT_START, graphic.Attributes[ATTR_HEADING_AT_START].ToString());
@@ -501,7 +503,7 @@ namespace MissionAgentReview {
             set {
                 _selectedAgentName = value;
                 // Do something with the agent name
-                Current.OnAgentSelected(value);
+                OnAgentSelected(value);
             }
         }
 
