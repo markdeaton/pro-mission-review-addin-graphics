@@ -327,7 +327,7 @@ namespace MissionAgentReview {
         }
 
         internal static void OnAgentTrackViewshedNextButtonClick() {
-            if (_viewshed?.Viewpoints == null) BuildViewpoints();
+            InitializeViewshedAndViewpointsIfNeeded();
             try {
                 _viewshed?.ShowNext();
             } catch (TimeSequencingViewshedInvalidException e) {
@@ -341,7 +341,7 @@ namespace MissionAgentReview {
             }
         }
         internal static void OnAgentTrackViewshedPrevButtonClick() {
-            if (_viewshed?.Viewpoints == null) BuildViewpoints();
+            InitializeViewshedAndViewpointsIfNeeded();
             try {
                 _viewshed?.ShowPrev();
             } catch (TimeSequencingViewshedInvalidException e) {
@@ -364,20 +364,93 @@ namespace MissionAgentReview {
                                                                       //FrameworkApplication.State.Deactivate(CHECKED_STATE);
                 _viewshed?.Stop();
             } else { // Start viewshed
-                   //FrameworkApplication.State.Activate(CHECKED_STATE);
-                // Has the viewshed been removed through other GUI means and is now invalid?
+                     //FrameworkApplication.State.Activate(CHECKED_STATE);
+                     // Has the viewshed been removed through other GUI means and is now invalid?
                 if (_viewshed != null && !_viewshed.IsValidAnalysisLayer) {
+                    // We could just recreate everything from scratch, but here we save time by reusing previously calculated viewpoints
                     TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(_viewshed.Viewpoints, _viewshed.ViewpointIndex, VERT_ANGLE,
                         HORIZ_ANGLE, MIN_DIST, MAX_DIST);
                     MapView mapView = MapView.Active;
-                    mapView?.RemoveExploratoryAnalysis(_viewshed); 
+                    mapView?.RemoveExploratoryAnalysis(_viewshed);
                     _viewshed.Dispose();
                     _viewshed = newViewshed;
                     mapView?.AddExploratoryAnalysis(_viewshed);
-                }
-                if (_viewshed?.Viewpoints == null) BuildViewpoints();
+                } else 
+                    InitializeViewshedAndViewpointsIfNeeded();
                 // And finally, start the sequence
                 _viewshed?.Start();
+            }
+        }
+
+        /// <summary>
+        /// This creates the viewshed analysis layer and calculates the list of track viewpoints, if needed.
+        /// This is intended to be a first-time initialization; it's different from what happens if a
+        /// viewshed was manually removed and then found to be missing.
+        /// </summary>
+        private static void InitializeViewshedAndViewpointsIfNeeded() {
+            if (_viewshed == null) {
+                QueuedTask.Run(() => {
+                    //Create placeholder camera for now
+                    Camera cam = new Camera(0, 0, 0, 0, 0, SpatialReferences.WebMercator);
+                    _viewshed = new TimeSequencingViewshed(cam, VERT_ANGLE, HORIZ_ANGLE, MIN_DIST, MAX_DIST);
+                    MapView.Active?.AddExploratoryAnalysis(_viewshed);
+                }).Wait();
+            }
+
+            if (_viewshed?.Viewpoints == null) BuildViewpoints();
+            return;
+
+            void BuildViewpoints() {
+                if (_viewshed == null) throw new InvalidOperationException("Viewshed cannot be null when building viewpoints");
+                MapView mapView = MapView.Active;
+                ArcGIS.Core.Geometry.SpatialReference sr = mapView.Map.SpatialReference;
+                IReadOnlyCollection<ExploratoryAnalysis> analyses = mapView?.GetExploratoryAnalysisCollection();
+                foreach (ExploratoryAnalysis analysis in analyses) {
+                    if (analysis is TimeSequencingViewshed) {
+                        _viewshed = (TimeSequencingViewshed)analysis;
+                        break;
+                    }
+                }
+                // Now set observer points 
+                // TODO If more than one agent track layer selected, eventually iterate along all agent points in selected layers
+                // Because this button can only be clicked if a valid layer is selected, we don't need to do any searching
+                GraphicsLayer glyr = (GraphicsLayer)mapView.GetSelectedLayers().FirstOrDefault();
+
+                QueuedTask.Run(() => {
+                    IReadOnlyList<GraphicElement> graphics = glyr.GetElementsAsFlattenedList();
+                    List<Camera> viewpoints = new List<Camera>();
+
+                    foreach (GraphicElement gelt in graphics) {
+                        if (!(gelt.GetGraphic() is CIMLineGraphic)) break;
+                        CIMLineGraphic lineGraphic = (CIMLineGraphic)gelt.GetGraphic();
+                        Polyline line = lineGraphic.Line;
+                        // Generally add the end point of the line as a viewshed spot, but make sure to also add the very starting point
+                        if (gelt == graphics.First() && !String.IsNullOrEmpty(gelt.GetCustomProperty(ATTR_HEADING_AT_START))) {
+                            MapPoint ptFirst = line.Points.First();
+                            Camera cam1 = ConstructCamera(ptFirst, sr, Double.Parse(gelt.GetCustomProperty(ATTR_HEADING_AT_START)));
+                            viewpoints.Add(cam1);
+                        }
+                        // Add the endpoint as viewshed camera
+                        MapPoint pt = line.Points.Last();
+                        Camera cam = ConstructCamera(pt, sr, Double.Parse(gelt.GetCustomProperty(ATTR_HEADING_AT_END)));
+                        viewpoints.Add(cam);
+                    }
+                    _viewshed.Viewpoints = viewpoints;
+
+                    Camera ConstructCamera(MapPoint pt, ArcGIS.Core.Geometry.SpatialReference srMap, double heading) {
+                        MapPoint ptProj = (MapPoint)GeometryEngine.Instance.Project(pt, srMap);
+
+                        // Heading adjust to -180 - 180; see https://pro.arcgis.com/en/pro-app/sdk/api-reference/#topic11449.html
+                        double fixedHeading = heading;
+                        if (fixedHeading == 360)
+                            fixedHeading = 0;
+                        else if ((int)(-fixedHeading / -180) == 0) fixedHeading = -fixedHeading % -180;
+                        else fixedHeading = (-fixedHeading % -180) + 180;
+
+                        Camera cam = new Camera(ptProj.X, ptProj.Y, ptProj.Z, -10, fixedHeading, srMap, CameraViewpoint.LookFrom);
+                        return cam;
+                    }
+                }).Wait();
             }
         }
 
@@ -387,65 +460,6 @@ namespace MissionAgentReview {
         private const double MAX_DIST = 75;
 
         private static TimeSequencingViewshed _viewshed = null;
-        private static void BuildViewpoints() {
-            MapView mapView = MapView.Active;
-            ArcGIS.Core.Geometry.SpatialReference sr = mapView.Map.SpatialReference;
-            IReadOnlyCollection<ExploratoryAnalysis> analyses = mapView?.GetExploratoryAnalysisCollection();
-            foreach (ExploratoryAnalysis analysis in analyses) {
-                if (analysis is TimeSequencingViewshed) {
-                    _viewshed = (TimeSequencingViewshed)analysis;
-                    break;
-                }
-            }
-            if (_viewshed == null) {
-                QueuedTask.Run(() => {
-                    //Create placeholder camera for now
-                    Camera cam = new Camera(0, 0, 0, 0, 0, SpatialReferences.WebMercator);
-                    _viewshed = new TimeSequencingViewshed(cam, VERT_ANGLE, HORIZ_ANGLE, MIN_DIST, MAX_DIST);
-                    mapView?.AddExploratoryAnalysis(_viewshed);
-                }).Wait();
-            }
-            // Now set observer points 
-            // TODO If more than one agent track layer selected, eventually iterate along all agent points in selected layers
-            // Because this button can only be clicked if a valid layer is selected, we don't need to do any searching
-            GraphicsLayer glyr = (GraphicsLayer)mapView.GetSelectedLayers().FirstOrDefault();
-
-            QueuedTask.Run(() => {
-                IReadOnlyList<GraphicElement> graphics = glyr.GetElementsAsFlattenedList();
-                List<Camera> viewpoints = new List<Camera>();
-
-                foreach (GraphicElement gelt in graphics) {
-                    if (!(gelt.GetGraphic() is CIMLineGraphic)) break;
-                    CIMLineGraphic lineGraphic = (CIMLineGraphic)gelt.GetGraphic();
-                    Polyline line = lineGraphic.Line;
-                    // Generally add the end point of the line as a viewshed spot, but make sure to also add the very starting point
-                    if (gelt == graphics.First() && !String.IsNullOrEmpty(gelt.GetCustomProperty(ATTR_HEADING_AT_START))) {
-                        MapPoint ptFirst = line.Points.First();
-                        Camera cam1 = ConstructCamera(ptFirst, sr, Double.Parse(gelt.GetCustomProperty(ATTR_HEADING_AT_START)));
-                        viewpoints.Add(cam1);
-                    }
-                    // Add the endpoint as viewshed camera
-                    MapPoint pt = line.Points.Last();
-                    Camera cam = ConstructCamera(pt, sr, Double.Parse(gelt.GetCustomProperty(ATTR_HEADING_AT_END)));
-                    viewpoints.Add(cam);
-                }
-                _viewshed.Viewpoints = viewpoints;
-
-                Camera ConstructCamera(MapPoint pt, ArcGIS.Core.Geometry.SpatialReference srMap, double heading) {
-                    MapPoint ptProj = (MapPoint)GeometryEngine.Instance.Project(pt, srMap);
-
-                    // Heading adjust to -180 - 180; see https://pro.arcgis.com/en/pro-app/sdk/api-reference/#topic11449.html
-                    double fixedHeading = heading;
-                    if (fixedHeading == 360)
-                        fixedHeading = 0;
-                    else if ((int)(-fixedHeading / -180) == 0) fixedHeading = -fixedHeading % -180;
-                    else fixedHeading = (-fixedHeading % -180) + 180;
-
-                    Camera cam = new Camera(ptProj.X, ptProj.Y, ptProj.Z, -10, fixedHeading, srMap, CameraViewpoint.LookFrom);
-                    return cam;
-                }
-            }).Wait();
-        }
 
         #endregion
 

@@ -21,11 +21,21 @@ namespace MissionAgentReview {
         }
         public TimeSequencingViewshed(IList<Camera> locations, int idxLocation, double verticalAngle, double horizontalAngle, double minimumDistance, double maximumDistance)
                                 : base(locations[idxLocation], verticalAngle, horizontalAngle, minimumDistance, maximumDistance) {
+            _viewpoints = locations;
             _viewpointIndex = idxLocation;
+            _timer.Elapsed += OnIntervalElapsed;
         }
 
         public bool IsValidAnalysisLayer {
-            get { return this.MapView != null && this.MapView.GetExploratoryAnalysisCollection().Contains(this); }
+            get {
+                bool valid = false;
+                try {
+                    valid = base.MapView != null && !Double.IsNaN(MinimumDistance) && !Double.IsNaN(MaximumDistance) && !Double.IsNaN(HorizontalAngle) && !Double.IsNaN(VerticalAngle);
+                } catch (InvalidOperationException) { // Base viewshed has been otherwise removed from the scene
+                    valid = false;
+                }
+                return valid;                
+            }
         }
 
         private bool _disposed = false;
@@ -109,5 +119,8 @@ namespace MissionAgentReview {
             _timer.Close();
             ((IDisposable)_timer).Dispose();
         }
+
+        #region Overrides
+        #endregion
     }
 }
