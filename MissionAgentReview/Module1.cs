@@ -232,8 +232,8 @@ namespace MissionAgentReview {
                         // Now that we have our graphics, we need a graphics layer. If it already exists, clear and reuse it; otherwise, create one.
                         GraphicsLayer graphicsLayer = null;
 
-                        string travelDist = pathGraphics.AgentTravelDistance().ToString("F2");
-                        string graphicsLayerName = $"{AGENTTRACKLYRNAME_PREAMBLE}{agentName} ({travelDist} {map.SpatialReference.Unit.Name}s)";
+                        string travelDist = pathGraphics.AgentTravelDistanceMeters().ToString("F2");
+                        string graphicsLayerName = $"{AGENTTRACKLYRNAME_PREAMBLE}{agentName} ({travelDist} m)";
                         IReadOnlyList<Layer> layers = map.FindLayers(graphicsLayerName, true);
                         if (layers.Count > 0 && layers.FirstOrDefault() is GraphicsLayer) { // Use the first one found
                             graphicsLayer = (GraphicsLayer)layers.FirstOrDefault();

@@ -86,7 +86,7 @@ namespace MissionAgentReview {
         private void OnIntervalElapsed(Object source, System.Timers.ElapsedEventArgs e) {
             try {
                 ShowNext();
-            } catch (TimeSequencingViewshedInvalidException exc) {
+            } catch (TimeSequencingViewshedInvalidException) {
                 Stop();
                 Dispose(); _disposed = true;
                 MessageBox.Show("The viewshed analysis was unexpectedly removed from the scene. Please invoke the analysis again.", "Invalid Viewshed Object");
