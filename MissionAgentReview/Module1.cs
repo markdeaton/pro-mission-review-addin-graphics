@@ -18,6 +18,9 @@ using System.Threading.Tasks;
 using Field = ArcGIS.Core.Data.Field;
 using QueryFilter = ArcGIS.Core.Data.QueryFilter;
 using MissionAgentReview.Extensions;
+using ArcGIS.Desktop.Core.Portal;
+using ArcGIS.Desktop.Core;
+using System.Collections;
 
 namespace MissionAgentReview {
     internal class Module1 : Module {
@@ -61,7 +64,6 @@ namespace MissionAgentReview {
         /// </summary>
         /// <returns>False to prevent Pro from closing, otherwise True</returns>
         protected override bool CanUnload() {
-            //TODO - add your business logic
             //return false to ~cancel~ Application close
             return true;
         }
@@ -81,11 +83,16 @@ namespace MissionAgentReview {
         /// </summary>
         /// <param name="obj">ArcGIS Pro map view reference</param>
         private void OnTOCSelectionChanged(MapViewEventArgs obj) {
-            bool isAgentTrackFeatLyrSelected = false;
-            bool areOnlyAgentTrackGraphicsLyrsSelected = true;
-
             MapView mv = obj.MapView;
+            bool isAgentTrackFeatLyrSelected = false;
+            bool areOnlyAgentTrackGraphicsLyrsSelected = mv.GetSelectedLayers().Count > 0;
+
             _agentTracksFeatureLayer = null;
+            if (_viewshed != null) {
+                MapView.Active.RemoveExploratoryAnalysis(_viewshed);
+                _viewshed.Dispose(); 
+                _viewshed = null;
+            }
 
             QueuedTask.Run(() => {
                 // 1. Look for add-on feature enablement conditions in the selected layer list
@@ -118,7 +125,10 @@ namespace MissionAgentReview {
                 }
             });
 
-            // Find and return a layer matching specs for Agent Tracks layer. Return null if not found.
+            /**
+             * <summary>Find and return a layer matching specs for Agent Tracks layer. Return null if not found.</summary>
+             * 
+             */
             async Task<FeatureLayer> isAgentTracksFeatureLayer(Layer lyr) {
                 FeatureLayer lyrFound = null;
                 if (lyr is FeatureLayer) {
@@ -178,6 +188,9 @@ namespace MissionAgentReview {
             }
         }
 
+        /**
+         * Logic that runs when an agent is selected from the dropdown list. This creates graphics tracks for that agent.
+         */
         private static void OnAgentSelected(string agentName) {
             ProgressorSource ps = new ProgressorSource("Finding agent path...", false);
             QueuedTask.Run<object>(() => {
@@ -193,10 +206,10 @@ namespace MissionAgentReview {
                 if (map.MapType == MapType.Map || map.MapType == MapType.Scene) {
 
                     // Create polylines between tracks, symbolized with arrows
-                    /* TODO Creating graphics layer adds and selects it, triggering the TOCSelectionChange event and nulling out the _lyrAgentTracks reference.
-                     * Have to wait till after this query to create the graphics layer and add elemnts to it. */
+                    /* Creating graphics layer adds and selects it, triggering the TOCSelectionChange event and nulling out the _agentTracksFeatureLayer reference.
+                     * Have to wait till after this query to create the graphics layer and add elements to it. */
                     using (RowCursor rowCur = _agentTracksFeatureLayer.Search(agentTracksQF)) {
-                        MapPoint prevPt = null; double? prevCourse = null;
+                        MapPoint prevPt = null; double? prevCourse = null; DateTime? prevPtDT = null;
                         IList<CIMLineGraphic> pathGraphics = new List<CIMLineGraphic>();
                         CIMPointGraphic startGraphic = null, endGraphic = null;
 
@@ -205,22 +218,28 @@ namespace MissionAgentReview {
                             using (Feature feat = (Feature)rowCur.Current) {
                                 MapPoint pt = (MapPoint)feat.GetShape();
                                 double? currCourse = (double?)feat[ATTR_COURSE];
+                                
+                                
+                                // Workaround to detect duplicate points that somehow strangely make it into collected tracks data
+                                // Strangely, they're a few milliseconds apart, so using the string representation lets us filter them out the way we want
+                                bool isDuplicatePoint = pt.X == prevPt?.X && pt.Y == prevPt?.Y &&
+                                    (feat[FIELD_CREATEDATETIME] as DateTime?).ToString() == prevPtDT?.ToString();
 
                                 if (prevPt == null) { // Create start graphic
                                     startGraphic = CreateAgentStartGraphic(pt);
-                                }
+                                } else if (!isDuplicatePoint) { // Create a linking graphic
+                                    CIMLineGraphic graphic = CreateAgentTrackLinkGraphic(feat, prevPt, pt, symbolRef);
 
-                                if (prevPt != null) { // Create a linking graphic
-                                    CIMLineGraphic graphic = CreateAgentTrackLinkGraphic(prevPt, pt, symbolRef);
-                                    Dictionary<string, object> attrs = new Dictionary<string, object>(2);
-                                    attrs.Add(ATTR_HEADING_AT_START, prevCourse);
-                                    attrs.Add(ATTR_HEADING_AT_END, currCourse);
+                                    //IDictionary<string, object> attrs = graphic.Attributes;
+                                    if (graphic.Attributes == null) graphic.Attributes = new Dictionary<string, object>();
+                                    graphic.Attributes.Add(ATTR_HEADING_AT_START, prevCourse);
+                                    graphic.Attributes.Add(ATTR_HEADING_AT_END, currCourse);
 
-                                    graphic.Attributes = attrs;
+                                    //graphic.Attributes = attrs;
 
                                     pathGraphics.Add(graphic);
                                 }
-                                prevPt = pt; prevCourse = currCourse;
+                                prevPt = pt; prevCourse = currCourse; prevPtDT = feat[FIELD_CREATEDATETIME] as DateTime?;
                             }
                         }
                         System.Diagnostics.Debug.WriteLine($"{pathGraphics.Count} lines created");
@@ -252,13 +271,14 @@ namespace MissionAgentReview {
                                 elt.SetCustomProperty(ATTR_HEADING_AT_END, graphic.Attributes[ATTR_HEADING_AT_END].ToString());
                          }
                         
-                        // Attributes improperly nulled in graphic elements added to graphics layer.
+                        // Attributes improperly nulled in graphic elements added to graphics layer. * Fixed in 2.7 as long as attributes don't include Shape *
                         // Need to use GraphicElement CustomProperties as a workaround.
                         graphicsLayer?.AddElement(startGraphic); Element lastElt = graphicsLayer?.AddElement(endGraphic);
                         
                         graphicsLayer?.SetVisibility(true);
-                        // TODO Crash upon exiting Pro if the following line is run with a null or empty parameter:
+                        // NOTE: Crash upon exiting Pro if the following line is run with a null or empty parameter:
                         //graphicsLayer?.UnSelectElements(new List<Element>() { lastElt });
+                        // Here's the workaround:
                         graphicsLayer?.ClearSelection();
                     }
                 }
@@ -313,22 +333,81 @@ namespace MissionAgentReview {
                 };
                 return lineSymbolWithArrow;
             }
-            CIMLineGraphic CreateAgentTrackLinkGraphic(MapPoint ptStart, MapPoint ptEnd, CIMSymbolReference symbolRef) {
+            CIMLineGraphic CreateAgentTrackLinkGraphic(Feature feat, MapPoint ptStart, MapPoint ptEnd, CIMSymbolReference symbolRef) {
                 CIMLineGraphic link = new CIMLineGraphic() {
                     Line = PolylineBuilder.CreatePolyline(new List<MapPoint>() { ptStart, ptEnd }),
-                    Symbol = symbolRef // _agentTrackLinkSymbol.MakeSymbolReference()
+                    Symbol = symbolRef
                 };
+                // Fill in attributes from feature
+                link.Attributes = new Dictionary<string, object>();
+                foreach (Field fld in feat.GetFields()) {
+                    // TODO Find out if any other field types than Geometry cause problems when adding a graphic to a graphics layer
+                    if (fld.FieldType != FieldType.Geometry)
+                        link.Attributes.Add(fld.Name, feat[fld.Name]);
+                }
                 return link;
             }
         }
 
+        /// <summary>
+        /// Handler for Select Agent Tracks dataset button click
+        /// </summary>
+        internal static void OnAgentTracksBrowseButtonClick() {
+            QueuedTask.Run(async () => {
+
+                PortalQueryParameters pqParams = new PortalQueryParameters("type:mission");
+                ArcGISPortal portal = ArcGISPortalManager.Current.GetActivePortal();
+                if (!portal.IsSignedOn()) {
+                    portal.SignIn();
+                }
+
+                IList<PortalItem> missions = new List<PortalItem>();
+                while (pqParams != null) { // We're force to deal with a results paging mechanism
+                    PortalQueryResultSet<PortalItem> portalItems = await portal.SearchForContentAsync(pqParams);
+                    System.Diagnostics.Debug.WriteLine($"{portalItems.Results.Count} items found");
+                    foreach (PortalItem pi in portalItems.Results) missions.Add(pi);
+
+                    pqParams = portalItems.NextQueryParameters;
+                }
+                // Now we should have all missions available
+                System.Diagnostics.Debug.WriteLine($"{missions.Count} missions found");
+
+                IList<Tuple<PortalItem, string, string>> listItems = new List<Tuple<PortalItem, string, string>>();
+                // For each mission, we run a query for a feature service named like "Tracks_" in the mission's folder
+                foreach (PortalItem mission in missions) {
+                    //string metadata = mission.GetXml(); // Doesn't give us the mission name we need
+                    string folderId = mission.FolderID;
+                    // Construct PortalFolder to get folder name for display as name of mission
+                    Item portalFolder = ItemFactory.Instance.Create(folderId, ItemFactory.ItemType.PortalFolderItem);
+                    // The Mission and its folder could be owned by someone else but shared. In that case, we can get to the Mission
+                    // and its tracks, but won't be able to read the folder name. And since there's no Mission item in the SDK yet, we
+                    // can't read its custom properties, so we won't have a friendly name for it.
+                    string missionName = portalFolder != null ? portalFolder.Name : "<Mission name unavailable>";
+                    string queryString = $"ownerfolder:{folderId} AND title:Tracks";
+                    PortalQueryResultSet<PortalItem> trackFCs =  await portal.SearchForContentAsync(new PortalQueryParameters(queryString));
+                    PortalItem trackFC = trackFCs.Results.FirstOrDefault();
+                    Tuple<PortalItem, string, string> listItem = new Tuple<PortalItem, string, string>(trackFC, missionName, trackFC.Title);
+                    listItems.Add(listItem);
+                }
+                System.Diagnostics.Debug.WriteLine($"{listItems.Count} items found");
+            }).Wait();
+        }
+
         #region LOS Toolset
+
+        private const double HORIZ_ANGLE = 120;
+        private const double VERT_ANGLE = 30;
+        private const double MIN_DIST = 1;
+        private const double MAX_DIST = 75;
+        private static TimeSequencingViewshed _viewshed = null;
 
         private bool isAgentTracksGraphicsLayer(Layer lyr) {
             return (lyr is GraphicsLayer && lyr.Name.StartsWith(AGENTTRACKLYRNAME_PREAMBLE));
         }
 
         internal static void OnAgentTrackViewshedNextButtonClick() {
+            // UNDONE Some tracks need to button clicks to advance. This isn't a code problem; duplicate tracks somehow often make it into the feature class. Unknown why.
+            // TODO Removing one agent's tracks manually & adding another still shows viewsheds along missing agent's track
             InitializeViewshedAndViewpointsIfNeeded();
             try {
                 _viewshed?.ShowNext();
@@ -405,7 +484,7 @@ namespace MissionAgentReview {
             void BuildViewpoints() {
                 if (_viewshed == null) throw new InvalidOperationException("Viewshed cannot be null when building viewpoints");
                 MapView mapView = MapView.Active;
-                ArcGIS.Core.Geometry.SpatialReference sr = mapView.Map.SpatialReference;
+                SpatialReference sr = mapView.Map.SpatialReference;
                 IReadOnlyCollection<ExploratoryAnalysis> analyses = mapView?.GetExploratoryAnalysisCollection();
                 foreach (ExploratoryAnalysis analysis in analyses) {
                     if (analysis is TimeSequencingViewshed) {
@@ -414,7 +493,7 @@ namespace MissionAgentReview {
                     }
                 }
                 // Now set observer points 
-                // TODO If more than one agent track layer selected, eventually iterate along all agent points in selected layers
+                // TODO If more than one agent track layer selected, want multiple viewsheds in selected layers
                 // Because this button can only be clicked if a valid layer is selected, we don't need to do any searching
                 GraphicsLayer glyr = (GraphicsLayer)mapView.GetSelectedLayers().FirstOrDefault();
 
@@ -422,8 +501,11 @@ namespace MissionAgentReview {
                     IReadOnlyList<GraphicElement> graphics = glyr.GetElementsAsFlattenedList();
                     List<Camera> viewpoints = new List<Camera>();
 
-                    foreach (GraphicElement gelt in graphics) {
-                        if (!(gelt.GetGraphic() is CIMLineGraphic)) break;
+                    for (int idx = 0; idx < graphics.Count; idx++) {
+                        GraphicElement gelt = graphics[idx];
+                        // Don't deal with start or end point graphics
+                        if (!(gelt.GetGraphic() is CIMLineGraphic)) continue;
+
                         CIMLineGraphic lineGraphic = (CIMLineGraphic)gelt.GetGraphic();
                         Polyline line = lineGraphic.Line;
                         // Generally add the end point of the line as a viewshed spot, but make sure to also add the very starting point
@@ -455,13 +537,6 @@ namespace MissionAgentReview {
                 }).Wait();
             }
         }
-
-        private const double HORIZ_ANGLE = 120;
-        private const double VERT_ANGLE = 30;
-        private const double MIN_DIST = 1;
-        private const double MAX_DIST = 75;
-
-        private static TimeSequencingViewshed _viewshed = null;
 
         #endregion
 

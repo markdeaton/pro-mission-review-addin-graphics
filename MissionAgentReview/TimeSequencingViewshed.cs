@@ -38,11 +38,6 @@ namespace MissionAgentReview {
             }
         }
 
-        private bool _disposed = false;
-/*        public bool Disposed {
-            get { return _disposed; }
-        }*/
-
         private Timer _timer = new Timer() { AutoReset = true, Interval = 2000 };
         /// <summary>
         /// How long he animation will pause with a viewshed analysis at each agent trackpoint
@@ -88,7 +83,7 @@ namespace MissionAgentReview {
                 ShowNext();
             } catch (TimeSequencingViewshedInvalidException) {
                 Stop();
-                Dispose(); _disposed = true;
+                Dispose();
                 MessageBox.Show("The viewshed analysis was unexpectedly removed from the scene. Please invoke the analysis again.", "Invalid Viewshed Object");
             }
         }

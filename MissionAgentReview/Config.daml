@@ -1,5 +1,6 @@
 ﻿<ArcGIS defaultAssembly="MissionAgentReview.dll" defaultNamespace="MissionAgentReview" xmlns="http://schemas.esri.com/DADF/Registry" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schemas.esri.com/DADF/Registry file:///C:/Program%20Files/ArcGIS/Pro/bin/ArcGIS.Desktop.Framework.xsd">
-  <AddInInfo id="{f12e418e-62f8-4094-b867-f8b3220ee73d}" version="1.0" desktopVersion="2.6.24783">
+  <AddInInfo id="{f12e418e-62f8-4094-b867-f8b3220ee73d}" version="1.0" desktopVersion="2.7.26825">
+    <!--desktopVersion="2.6.24783"-->
     <Name>MissionAgentReview</Name>
     <Description>ArcGIS Mission Post-Review Tools</Description>
     <Image>Images\AddinDesktop32.png</Image>
@@ -64,7 +65,8 @@
         </tabGroup>
       </tabGroups>
       <tabs>
-        <tab id="MissionAgentReview_Tab" caption="Post-Mission Review" condition="MissionReviewTabEnabled_Condition" keytip="A" tabGroupID="MissionReview_TabGroup">
+        <!--condition="MissionReviewTabEnabled_Condition"-->
+        <tab id="MissionAgentReview_Tab" caption="Post-Mission Review" keytip="A" tabGroupID="MissionReview_TabGroup">
           <group refID="MissionReview_GenerateTracks_Group" />
           <group refID="MissionReview_LOS_Group"/>
         </tab>
@@ -73,11 +75,11 @@
         <!-- Track line generation tools -->
         <group id="MissionReview_GenerateTracks_Group" caption="Find Agent Tracks" appearsOnAddInTab="false">
           <!-- host controls within groups -->
-          <!--<button refID="MissionAgentReview_Button1" size="large" />-->
           <comboBox refID="MissionAgentReviewAgents_Combo" size="large"/>
         </group>
         <!-- Line of sight analysis tools -->
         <group id="MissionReview_LOS_Group" caption="Sightline Analysis" appearsOnAddInTab="false">
+          <button refID="AgentTracksBrowse_Button" size="large"/>
           <button refID="AgentTracksViewshed_Button" size="large"/>
           <button refID="AgentTracksViewshedPrev_Button" size="large"/>
           <button refID="AgentTracksViewshedNext_Button" size="large"/>
@@ -85,6 +87,11 @@
       </groups>
       <controls>
         <!-- add your controls here -->
+        <!-- Button to browser for an Agent Tracks dataset -->
+        <button id="AgentTracksBrowse_Button" className="MissionAgentReview_Module:OnAgentTracksBrowseButtonClick" caption="Open Agent Tracks"
+                loadOnClick="true" largeImage="Images\GenericButtonGreen32.png" smallImage="Images\GenericButtonGreen16.png">
+          <tooltip heading="Tracks Dataset">Select an agent tracks dataset to add to the map</tooltip>
+        </button>
         <!-- Combo Box that holds the list of agents -->
         <comboBox id="MissionAgentReviewAgents_Combo" caption="Mission Agents:" className="AgentsCombo" 
                   condition="AgentTrackGeneratorListEnabled_Condition"
