@@ -32,6 +32,7 @@ namespace MissionAgentReview {
         };
         private const string FIELD_AGENTNAME = "created_user";
         private const string FIELD_CREATEDATETIME = "created_date";
+        private const string FIELD_TIMESTAMP = "location_timestamp";
         private const string AGENTTRACKLYRNAME_PREAMBLE = "Agent Path: ";
         private static FeatureLayer _agentTracksFeatureLayer;
 
@@ -206,10 +207,8 @@ namespace MissionAgentReview {
                 if (map.MapType == MapType.Map || map.MapType == MapType.Scene) {
 
                     // Create polylines between tracks, symbolized with arrows
-                    /* Creating graphics layer adds and selects it, triggering the TOCSelectionChange event and nulling out the _agentTracksFeatureLayer reference.
-                     * Have to wait till after this query to create the graphics layer and add elements to it. */
                     using (RowCursor rowCur = _agentTracksFeatureLayer.Search(agentTracksQF)) {
-                        MapPoint prevPt = null; double? prevCourse = null; DateTime? prevPtDT = null;
+                        MapPoint prevPt = null; double? prevCourse = null; DateTime? prevPtCreateDT = null; /*DateTime? prevPtTimestamp = null;*/
                         IList<CIMLineGraphic> pathGraphics = new List<CIMLineGraphic>();
                         CIMPointGraphic startGraphic = null, endGraphic = null;
 
@@ -218,28 +217,26 @@ namespace MissionAgentReview {
                             using (Feature feat = (Feature)rowCur.Current) {
                                 MapPoint pt = (MapPoint)feat.GetShape();
                                 double? currCourse = (double?)feat[ATTR_COURSE];
-                                
-                                
+
+
+                                // UNDONE Some tracks need two button clicks to advance. This isn't a code problem; duplicate tracks somehow often make it into the feature class. Unknown why.
                                 // Workaround to detect duplicate points that somehow strangely make it into collected tracks data
                                 // Strangely, they're a few milliseconds apart, so using the string representation lets us filter them out the way we want
                                 bool isDuplicatePoint = pt.X == prevPt?.X && pt.Y == prevPt?.Y &&
-                                    (feat[FIELD_CREATEDATETIME] as DateTime?).ToString() == prevPtDT?.ToString();
+                                    (feat[FIELD_CREATEDATETIME] as DateTime?).ToString() == prevPtCreateDT?.ToString();
 
                                 if (prevPt == null) { // Create start graphic
                                     startGraphic = CreateAgentStartGraphic(pt);
                                 } else if (!isDuplicatePoint) { // Create a linking graphic
                                     CIMLineGraphic graphic = CreateAgentTrackLinkGraphic(feat, prevPt, pt, symbolRef);
 
-                                    //IDictionary<string, object> attrs = graphic.Attributes;
                                     if (graphic.Attributes == null) graphic.Attributes = new Dictionary<string, object>();
                                     graphic.Attributes.Add(ATTR_HEADING_AT_START, prevCourse);
                                     graphic.Attributes.Add(ATTR_HEADING_AT_END, currCourse);
 
-                                    //graphic.Attributes = attrs;
-
                                     pathGraphics.Add(graphic);
                                 }
-                                prevPt = pt; prevCourse = currCourse; prevPtDT = feat[FIELD_CREATEDATETIME] as DateTime?;
+                                prevPt = pt; prevCourse = currCourse; prevPtCreateDT = feat[FIELD_CREATEDATETIME] as DateTime?; /*prevPtTimestamp = feat[FIELD_TIMESTAMP] as DateTime?;*/
                             }
                         }
                         System.Diagnostics.Debug.WriteLine($"{pathGraphics.Count} lines created");
@@ -353,7 +350,7 @@ namespace MissionAgentReview {
         /// Handler for Select Agent Tracks dataset button click
         /// </summary>
         internal static void OnAgentTracksBrowseButtonClick() {
-            QueuedTask.Run(async () => {
+            var tskMissions = QueuedTask.Run(async () => {
 
                 PortalQueryParameters pqParams = new PortalQueryParameters("type:mission");
                 ArcGISPortal portal = ArcGISPortalManager.Current.GetActivePortal();
@@ -382,15 +379,19 @@ namespace MissionAgentReview {
                     // The Mission and its folder could be owned by someone else but shared. In that case, we can get to the Mission
                     // and its tracks, but won't be able to read the folder name. And since there's no Mission item in the SDK yet, we
                     // can't read its custom properties, so we won't have a friendly name for it.
-                    string missionName = portalFolder != null ? portalFolder.Name : "<Mission name unavailable>";
+                    string missionName = portalFolder != null ? portalFolder.Name : $"<Mission name unavailable> ID:{mission.ItemID}";
                     string queryString = $"ownerfolder:{folderId} AND title:Tracks";
-                    PortalQueryResultSet<PortalItem> trackFCs =  await portal.SearchForContentAsync(new PortalQueryParameters(queryString));
+                    PortalQueryResultSet<PortalItem> trackFCs = await portal.SearchForContentAsync(new PortalQueryParameters(queryString));
                     PortalItem trackFC = trackFCs.Results.FirstOrDefault();
                     Tuple<PortalItem, string, string> listItem = new Tuple<PortalItem, string, string>(trackFC, missionName, trackFC.Title);
                     listItems.Add(listItem);
                 }
                 System.Diagnostics.Debug.WriteLine($"{listItems.Count} items found");
-            }).Wait();
+                return listItems;
+            }).GetAwaiter().GetResult();
+
+
+            System.Diagnostics.Debugger.Break();
         }
 
         #region LOS Toolset
@@ -406,8 +407,6 @@ namespace MissionAgentReview {
         }
 
         internal static void OnAgentTrackViewshedNextButtonClick() {
-            // UNDONE Some tracks need to button clicks to advance. This isn't a code problem; duplicate tracks somehow often make it into the feature class. Unknown why.
-            // TODO Removing one agent's tracks manually & adding another still shows viewsheds along missing agent's track
             InitializeViewshedAndViewpointsIfNeeded();
             try {
                 _viewshed?.ShowNext();
