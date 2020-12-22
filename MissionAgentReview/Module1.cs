@@ -21,6 +21,7 @@ using MissionAgentReview.Extensions;
 using ArcGIS.Desktop.Core.Portal;
 using ArcGIS.Desktop.Core;
 using System.Collections;
+using MissionAgentReview.datatypes;
 
 namespace MissionAgentReview {
     internal class Module1 : Module {
@@ -258,7 +259,7 @@ namespace MissionAgentReview {
                             // Create graphics overlay
                             // Unfortunately, the layer gets automatically selected and there doesn't seem to be a way to change that...
                             GraphicsLayerCreationParams gl_param = new GraphicsLayerCreationParams() { Name = graphicsLayerName };
-                            graphicsLayer = LayerFactory.Instance.CreateLayer<ArcGIS.Desktop.Mapping.GraphicsLayer>(gl_param, map);
+                            graphicsLayer = LayerFactory.Instance.CreateLayer<GraphicsLayer>(gl_param, map);
                         }
                         foreach (CIMLineGraphic graphic in pathGraphics) {
                             GraphicElement elt = graphicsLayer?.AddElement(graphic);
@@ -349,8 +350,8 @@ namespace MissionAgentReview {
         /// <summary>
         /// Handler for Select Agent Tracks dataset button click
         /// </summary>
-        internal static void OnAgentTracksBrowseButtonClick() {
-            var tskMissions = QueuedTask.Run(async () => {
+        internal static async void OnAgentTracksBrowseButtonClick() {
+            var lstMissions = await QueuedTask.Run(async () => {
 
                 PortalQueryParameters pqParams = new PortalQueryParameters("type:mission");
                 ArcGISPortal portal = ArcGISPortalManager.Current.GetActivePortal();
@@ -362,14 +363,14 @@ namespace MissionAgentReview {
                 while (pqParams != null) { // We're force to deal with a results paging mechanism
                     PortalQueryResultSet<PortalItem> portalItems = await portal.SearchForContentAsync(pqParams);
                     System.Diagnostics.Debug.WriteLine($"{portalItems.Results.Count} items found");
-                    foreach (PortalItem pi in portalItems.Results) missions.Add(pi);
+                    foreach (PortalItem portalItem in portalItems.Results) missions.Add(portalItem);
 
                     pqParams = portalItems.NextQueryParameters;
                 }
                 // Now we should have all missions available
                 System.Diagnostics.Debug.WriteLine($"{missions.Count} missions found");
 
-                IList<Tuple<PortalItem, string, string>> listItems = new List<Tuple<PortalItem, string, string>>();
+                IList<MissionTracksItem> listItems = new List<MissionTracksItem>();
                 // For each mission, we run a query for a feature service named like "Tracks_" in the mission's folder
                 foreach (PortalItem mission in missions) {
                     //string metadata = mission.GetXml(); // Doesn't give us the mission name we need
@@ -379,19 +380,27 @@ namespace MissionAgentReview {
                     // The Mission and its folder could be owned by someone else but shared. In that case, we can get to the Mission
                     // and its tracks, but won't be able to read the folder name. And since there's no Mission item in the SDK yet, we
                     // can't read its custom properties, so we won't have a friendly name for it.
-                    string missionName = portalFolder != null ? portalFolder.Name : $"<Mission name unavailable> ID:{mission.ItemID}";
+                    string missionName = portalFolder != null ? portalFolder.Name : "<Mission name unavailable>";
                     string queryString = $"ownerfolder:{folderId} AND title:Tracks";
                     PortalQueryResultSet<PortalItem> trackFCs = await portal.SearchForContentAsync(new PortalQueryParameters(queryString));
                     PortalItem trackFC = trackFCs.Results.FirstOrDefault();
-                    Tuple<PortalItem, string, string> listItem = new Tuple<PortalItem, string, string>(trackFC, missionName, trackFC.Title);
+                    MissionTracksItem listItem = new MissionTracksItem(trackFC, missionName, trackFC.Title);
                     listItems.Add(listItem);
                 }
                 System.Diagnostics.Debug.WriteLine($"{listItems.Count} items found");
                 return listItems;
-            }).GetAwaiter().GetResult();
+            });
 
+            // Pass Mission items list to list dialog and show it
+            DlgChooseMission dlg = new DlgChooseMission(lstMissions);
+            bool? result = dlg.ShowDialog();
+            if (result ?? false) {
+                // Do something with chosen item
+                MissionTracksItem item = dlg.SelectedItem;
+                await QueuedTask.Run(() => LayerFactory.Instance.CreateLayer(item.PortalItem, MapView.Active.Map, layerName:item.MissionName));
+            }
+            //else canceled
 
-            System.Diagnostics.Debugger.Break();
         }
 
         #region LOS Toolset
@@ -507,6 +516,8 @@ namespace MissionAgentReview {
 
                         CIMLineGraphic lineGraphic = (CIMLineGraphic)gelt.GetGraphic();
                         Polyline line = lineGraphic.Line;
+                        if (line.PointCount <= 0) continue;
+
                         // Generally add the end point of the line as a viewshed spot, but make sure to also add the very starting point
                         if (gelt == graphics.First() && !String.IsNullOrEmpty(gelt.GetCustomProperty(ATTR_HEADING_AT_START))) {
                             MapPoint ptFirst = line.Points.First();

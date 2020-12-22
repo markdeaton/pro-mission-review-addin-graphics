@@ -125,10 +125,15 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AgentsCombo.cs" />
+    <Compile Include="datatypes\MissionTracksItem.cs" />
+    <Compile Include="DlgChooseMission.xaml.cs">
+      <DependentUpon>DlgChooseMission.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Exceptions\TimeSequencingViewshedInvalidException.cs" />
     <Compile Include="Extensions\Extensions.cs" />
     <Compile Include="Module1.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ShowDlgChooseMission.cs" />
     <Compile Include="TimeSequencingViewshed.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -158,6 +163,12 @@
   <ItemGroup>
     <AddInContent Include="Images\viewshed_play_16.png" />
     <AddInContent Include="Images\viewshed_play_32.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Page Include="DlgChooseMission.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!--
