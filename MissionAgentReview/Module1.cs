@@ -209,7 +209,7 @@ namespace MissionAgentReview {
 
                     // Create polylines between tracks, symbolized with arrows
                     using (RowCursor rowCur = _agentTracksFeatureLayer.Search(agentTracksQF)) {
-                        MapPoint prevPt = null; double? prevCourse = null; DateTime? prevPtCreateDT = null; /*DateTime? prevPtTimestamp = null;*/
+                        MapPoint prevPt = null; double? prevCourse = null; /*DateTime? prevPtCreateDT = null;*/ DateTime? prevPtTimestamp = null;
                         IList<CIMLineGraphic> pathGraphics = new List<CIMLineGraphic>();
                         CIMPointGraphic startGraphic = null, endGraphic = null;
 
@@ -224,7 +224,7 @@ namespace MissionAgentReview {
                                 // Workaround to detect duplicate points that somehow strangely make it into collected tracks data
                                 // Strangely, they're a few milliseconds apart, so using the string representation lets us filter them out the way we want
                                 bool isDuplicatePoint = pt.X == prevPt?.X && pt.Y == prevPt?.Y &&
-                                    (feat[FIELD_CREATEDATETIME] as DateTime?).ToString() == prevPtCreateDT?.ToString();
+                                    (feat[/*FIELD_CREATEDATETIME*/FIELD_TIMESTAMP] as DateTime?).ToString() == prevPtTimestamp?.ToString();
 
                                 if (prevPt == null) { // Create start graphic
                                     startGraphic = CreateAgentStartGraphic(pt);
@@ -237,7 +237,7 @@ namespace MissionAgentReview {
 
                                     pathGraphics.Add(graphic);
                                 }
-                                prevPt = pt; prevCourse = currCourse; prevPtCreateDT = feat[FIELD_CREATEDATETIME] as DateTime?; /*prevPtTimestamp = feat[FIELD_TIMESTAMP] as DateTime?;*/
+                                prevPt = pt; prevCourse = currCourse; /*prevPtCreateDT = feat[FIELD_CREATEDATETIME] as DateTime?;*/ prevPtTimestamp = feat[FIELD_TIMESTAMP] as DateTime?;
                             }
                         }
                         System.Diagnostics.Debug.WriteLine($"{pathGraphics.Count} lines created");
@@ -263,6 +263,7 @@ namespace MissionAgentReview {
                         }
                         foreach (CIMLineGraphic graphic in pathGraphics) {
                             GraphicElement elt = graphicsLayer?.AddElement(graphic);
+                            int ptCt = (elt.GetGraphic() as CIMLineGraphic).Line.PointCount;
                             if (graphic.Attributes.ContainsKey(ATTR_HEADING_AT_START))
                                 elt.SetCustomProperty(ATTR_HEADING_AT_START, graphic.Attributes[ATTR_HEADING_AT_START].ToString());
                             if (graphic.Attributes.ContainsKey(ATTR_HEADING_AT_END))
@@ -516,6 +517,9 @@ namespace MissionAgentReview {
 
                         CIMLineGraphic lineGraphic = (CIMLineGraphic)gelt.GetGraphic();
                         Polyline line = lineGraphic.Line;
+
+                        // Graphics with no points should no longer be added (see OnAgentSelected() above).
+                        // However, leaving this line in as a safety check.
                         if (line.PointCount <= 0) continue;
 
                         // Generally add the end point of the line as a viewshed spot, but make sure to also add the very starting point
