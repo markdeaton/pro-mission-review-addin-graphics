@@ -24,8 +24,16 @@
         <ListView Name="lstMissions" SelectionMode="Single" SelectionChanged="lstMissions_SelectionChanged" Margin="10" Grid.Row="0">
             <ListView.View>
                 <GridView>
-                    <GridViewColumn Header="Mission" DisplayMemberBinding="{Binding Path='MissionName'}" Width="Auto"/>
-                    <GridViewColumn Header="Track Feat Class" DisplayMemberBinding="{Binding Path='TrackFCTitle'}" Width="Auto"/>
+                    <GridViewColumn DisplayMemberBinding="{Binding Path='MissionName'}" Width="Auto">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="GridViewColumnHeader_Click">Mission</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding Path='TrackFCTitle'}" Width="Auto">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Click="GridViewColumnHeader_Click">Tracks Feature Class</GridViewColumnHeader>
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
                 </GridView>
             </ListView.View>
         </ListView>

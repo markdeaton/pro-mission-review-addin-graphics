@@ -5,22 +5,18 @@ namespace MissionAgentReview.datatypes {
         public MissionTracksItem(PortalItem portalItem, string missionName, string trackFCTitle) {
             this.PortalItem = portalItem;
             this.MissionName = missionName;
-            this.trackFCTitle = trackFCTitle;
+            this.TrackFCTitle = trackFCTitle;
         }
 
         public override string ToString() {
-            return $"{MissionName} [{trackFCTitle}]";
+            return $"{MissionName} [{TrackFCTitle}]";
         }
 
         #region Properties
-        private PortalItem _portalItem;
-        private string _missionName;
-        private string trackFCTitle;
+        public PortalItem PortalItem { get; set; }
+        public string MissionName { get; set; }
+        public string TrackFCTitle { get; set; }
 
-        public PortalItem PortalItem { get => _portalItem; set => _portalItem = value; }
-        public string MissionName { get => _missionName; set => _missionName = value; }
-        public string TrackFCTitle { get => trackFCTitle; set => trackFCTitle = value; }
-
-        #endregion    
+        #endregion
     }
 }
