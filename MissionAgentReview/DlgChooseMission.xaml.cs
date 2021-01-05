@@ -49,7 +49,7 @@ namespace MissionAgentReview {
             this.DialogResult = true;
         }
 
-        private void lstMissions_SelectionChanged(object sender, SelectionChangedEventArgs e) {
+        private void LstMissions_SelectionChanged(object sender, SelectionChangedEventArgs e) {
             SelectedItem = (MissionTracksItem)e.AddedItems[0];
         }
 
@@ -59,10 +59,9 @@ namespace MissionAgentReview {
         GridViewColumnHeader _lastHeaderClicked = null;
         ListSortDirection _lastDirection = ListSortDirection.Ascending;
         private void GridViewColumnHeader_Click(object sender, RoutedEventArgs e) {
-            var headerClicked = e.OriginalSource as GridViewColumnHeader;
+            if (e.OriginalSource is GridViewColumnHeader headerClicked) { 
             ListSortDirection direction;
 
-            if (headerClicked != null) {
                 if (headerClicked.Role != GridViewColumnHeaderRole.Padding) {
                     if (headerClicked != _lastHeaderClicked) {
                         direction = ListSortDirection.Ascending;

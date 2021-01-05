@@ -20,8 +20,8 @@ using QueryFilter = ArcGIS.Core.Data.QueryFilter;
 using MissionAgentReview.Extensions;
 using ArcGIS.Desktop.Core.Portal;
 using ArcGIS.Desktop.Core;
-using System.Collections;
 using MissionAgentReview.datatypes;
+using ArcGIS.Desktop.Framework.Dialogs;
 
 namespace MissionAgentReview {
     internal class Module1 : Module {
@@ -352,16 +352,24 @@ namespace MissionAgentReview {
         /// Handler for Select Agent Tracks dataset button click
         /// </summary>
         internal static async void OnAgentTracksBrowseButtonClick() {
-            var lstMissions = await QueuedTask.Run(async () => {
+            ProgressorSource ps = new ProgressorSource("Finding avaiable Missions...", /*"Mission search canceled",*/ true);
 
-                PortalQueryParameters pqParams = new PortalQueryParameters("type:mission");
+            var lstMissions = await QueuedTask.Run(async () => {
+                IList<MissionTracksItem> listItems = new List<MissionTracksItem>();
+
+                PortalQueryParameters pqParams = new PortalQueryParameters("type:\"Mission\"");
+                ps.Message = "Checking active portal";
                 ArcGISPortal portal = ArcGISPortalManager.Current.GetActivePortal();
+                ps.Message = $"Connecting to {portal.PortalUri}";
                 if (!portal.IsSignedOn()) {
-                    portal.SignIn();
+                    //if (!portal.SignIn().success) {
+                        MessageBox.Show("You must be signed into a portal for this. Please do so before trying to open a Mission.");
+                        return listItems;
                 }
 
+                ps.Message = "Finding available Missions...";
                 IList<PortalItem> missions = new List<PortalItem>();
-                while (pqParams != null) { // We're force to deal with a results paging mechanism
+                while (pqParams != null) { // We're forced to deal with a results paging mechanism
                     PortalQueryResultSet<PortalItem> portalItems = await portal.SearchForContentAsync(pqParams);
                     System.Diagnostics.Debug.WriteLine($"{portalItems.Results.Count} items found");
                     foreach (PortalItem portalItem in portalItems.Results) missions.Add(portalItem);
@@ -370,8 +378,11 @@ namespace MissionAgentReview {
                 }
                 // Now we should have all missions available
                 System.Diagnostics.Debug.WriteLine($"{missions.Count} missions found");
+                if (missions.Count <= 0) {
+                    MessageBox.Show("No available Missions could be found.");
+                    return listItems;
+                }
 
-                IList<MissionTracksItem> listItems = new List<MissionTracksItem>();
                 // For each mission, we run a query for a feature service named like "Tracks_" in the mission's folder
                 foreach (PortalItem mission in missions) {
                     //string metadata = mission.GetXml(); // Doesn't give us the mission name we need
@@ -390,7 +401,10 @@ namespace MissionAgentReview {
                 }
                 System.Diagnostics.Debug.WriteLine($"{listItems.Count} items found");
                 return listItems;
-            });
+            }, ps.Progressor);
+
+            // If there was a problem enumerating Missions, don't show a chooser dialog
+            if (lstMissions.Count <= 0) return;
 
             // Pass Mission items list to list dialog and show it
             DlgChooseMission dlg = new DlgChooseMission(lstMissions);
