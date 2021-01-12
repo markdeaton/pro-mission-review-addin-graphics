@@ -36,6 +36,7 @@ namespace MissionAgentReview {
         private const string FIELD_TIMESTAMP = "location_timestamp";
         private const string AGENTTRACKLYRNAME_PREAMBLE = "Agent Path: ";
         private static FeatureLayer _agentTracksFeatureLayer;
+        private static Dictionary<GraphicsLayer, TimeSequencingViewshed> _dctGLViewshed = new Dictionary<GraphicsLayer, TimeSequencingViewshed>();
 
         /// <summary>
         /// Graphic attribute to hold the agent's heading at the beginning of a line connector
@@ -85,6 +86,8 @@ namespace MissionAgentReview {
         /// </summary>
         /// <param name="obj">ArcGIS Pro map view reference</param>
         private void OnTOCSelectionChanged(MapViewEventArgs obj) {
+            // TODO Determine which agent tracks aren't deselected and remove their viewsheds (if needed)
+            // TODO Determine which agent tracks are selected and add viewsheds (if needed)
             MapView mv = obj.MapView;
             bool isAgentTrackFeatLyrSelected = false;
             bool areOnlyAgentTrackGraphicsLyrsSelected = mv.GetSelectedLayers().Count > 0;
