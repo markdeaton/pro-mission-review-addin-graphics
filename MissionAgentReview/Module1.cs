@@ -36,7 +36,6 @@ namespace MissionAgentReview {
         private const string FIELD_TIMESTAMP = "location_timestamp";
         private const string AGENTTRACKLYRNAME_PREAMBLE = "Agent Path: ";
         private static FeatureLayer _agentTracksFeatureLayer;
-        private static Dictionary<GraphicsLayer, TimeSequencingViewshed> _dctGLViewshed = new Dictionary<GraphicsLayer, TimeSequencingViewshed>();
 
         /// <summary>
         /// Graphic attribute to hold the agent's heading at the beginning of a line connector
@@ -88,28 +87,29 @@ namespace MissionAgentReview {
         private void OnTOCSelectionChanged(MapViewEventArgs obj) {
             // TODO Determine which agent tracks aren't deselected and remove their viewsheds (if needed)
             // TODO Determine which agent tracks are selected and add viewsheds (if needed)
-            MapView mv = obj.MapView;
-            bool isAgentTrackFeatLyrSelected = false;
-            bool areOnlyAgentTrackGraphicsLyrsSelected = mv.GetSelectedLayers().Count > 0;
+            QueuedTask.Run(async () => {
+                MapView mv = obj.MapView;
+                bool isAgentTrackFeatLyrSelected = false;
+                bool areOnlyAgentTrackGraphicsLyrsSelected = mv.GetSelectedLayers().Count > 0;
 
-            _agentTracksFeatureLayer = null;
-            if (_viewshed != null) {
-                MapView.Active.RemoveExploratoryAnalysis(_viewshed);
-                _viewshed.Dispose(); 
-                _viewshed = null;
-            }
+                _agentTracksFeatureLayer = null;
 
-            QueuedTask.Run(() => {
+                ClearExistingViewsheds();
+
+                IReadOnlyList<Layer> lyrs = mv.GetSelectedLayers();
                 // 1. Look for add-on feature enablement conditions in the selected layer list
-                foreach (Layer lyr in mv.GetSelectedLayers()) {
+                foreach (Layer lyr in lyrs) {
                     // Only agent track result graphics layers selected?
                     // Unfortunately, we can only search by graphic layer type and layer name
+                    if (isAgentTracksGraphicsLayer(lyr)) {
+                        _dctGLViewshed.Add(lyr as GraphicsLayer, null);
+                    }
                     areOnlyAgentTrackGraphicsLyrsSelected &= isAgentTracksGraphicsLayer(lyr);
 
                     // Look for one that has all the characteristics of a Mission agent tracks layer
-                    Task<FeatureLayer> lyrFound = isAgentTracksFeatureLayer(lyr);
-                    if (_agentTracksFeatureLayer == null && lyrFound.Result != null) {
-                        _agentTracksFeatureLayer = lyrFound.Result;
+                    FeatureLayer lyrFound = await extractAgentTracksFeatureLayer(lyr);
+                    if (_agentTracksFeatureLayer == null && lyrFound != null) {
+                        _agentTracksFeatureLayer = lyrFound;
                         isAgentTrackFeatLyrSelected = true;
                         //break;
                     }
@@ -132,9 +132,8 @@ namespace MissionAgentReview {
 
             /**
              * <summary>Find and return a layer matching specs for Agent Tracks layer. Return null if not found.</summary>
-             * 
              */
-            async Task<FeatureLayer> isAgentTracksFeatureLayer(Layer lyr) {
+            async Task<FeatureLayer> extractAgentTracksFeatureLayer(Layer lyr) {
                 FeatureLayer lyrFound = null;
                 if (lyr is FeatureLayer) {
                     bool isPointGeom, isJoinedTable, hasDataRows, hasUserField, hasCreateDateField;
@@ -160,7 +159,7 @@ namespace MissionAgentReview {
                 } else if (lyr is GroupLayer) { // recursion for grouped layers
                     foreach (Layer groupedLyr in ((GroupLayer)lyr).Layers) {
                         try {
-                            Task<FeatureLayer> groupedLyrResult = isAgentTracksFeatureLayer(groupedLyr);
+                            Task<FeatureLayer> groupedLyrResult = extractAgentTracksFeatureLayer(groupedLyr);
                             await groupedLyrResult;
                             if (groupedLyrResult.Result != null) {
                                 lyrFound = groupedLyrResult.Result;
@@ -427,66 +426,97 @@ namespace MissionAgentReview {
         private const double VERT_ANGLE = 30;
         private const double MIN_DIST = 1;
         private const double MAX_DIST = 75;
-        private static TimeSequencingViewshed _viewshed = null;
+        //private static TimeSequencingViewshed _viewshed = null;
+        private static Dictionary<GraphicsLayer, TimeSequencingViewshed> _dctGLViewshed = new Dictionary<GraphicsLayer, TimeSequencingViewshed>();
 
         private bool isAgentTracksGraphicsLayer(Layer lyr) {
             return (lyr is GraphicsLayer && lyr.Name.StartsWith(AGENTTRACKLYRNAME_PREAMBLE));
         }
 
         internal static void OnAgentTrackViewshedNextButtonClick() {
-            InitializeViewshedAndViewpointsIfNeeded();
-            try {
-                _viewshed?.ShowNext();
-            } catch (TimeSequencingViewshedInvalidException e) {
-                // The viewshed has probably been removed through the GUI. But we can recreate it.
-                TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(e.Viewpoints, e.CurrentViewpointIndex, VERT_ANGLE, 
-                    HORIZ_ANGLE, MIN_DIST, MAX_DIST);
-                MapView mapView = MapView.Active;
-                mapView?.RemoveExploratoryAnalysis(_viewshed); _viewshed.Dispose();
-                _viewshed = newViewshed;
-                mapView?.AddExploratoryAnalysis(_viewshed);
+            foreach (GraphicsLayer lyr in _dctGLViewshed.Keys.ToList()) {
+                TimeSequencingViewshed tsv = _dctGLViewshed[lyr];
+                if (tsv == null) tsv = InitializeViewshedAndViewpoints(lyr);
+                try {
+                    tsv?.ShowNext();
+                } catch (TimeSequencingViewshedInvalidException e) {
+                    // The viewshed has probably been removed through the GUI. But we can recreate it.
+                    TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(e.Viewpoints, e.CurrentViewpointIndex, VERT_ANGLE,
+                        HORIZ_ANGLE, MIN_DIST, MAX_DIST);
+                    MapView mapView = MapView.Active;
+                    mapView?.RemoveExploratoryAnalysis(tsv); tsv.Dispose();
+                    tsv = newViewshed;
+                    mapView?.AddExploratoryAnalysis(tsv);
+                }
+                _dctGLViewshed[lyr] = tsv;
             }
         }
         internal static void OnAgentTrackViewshedPrevButtonClick() {
-            InitializeViewshedAndViewpointsIfNeeded();
-            try {
-                _viewshed?.ShowPrev();
-            } catch (TimeSequencingViewshedInvalidException e) {
-                // The viewshed has probably been removed through the GUI. But we can recreate it.
-                TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(e.Viewpoints, e.CurrentViewpointIndex, VERT_ANGLE,
-                    HORIZ_ANGLE, MIN_DIST, MAX_DIST);
-                MapView mapView = MapView.Active;
-                mapView?.RemoveExploratoryAnalysis(_viewshed); 
-                _viewshed.Dispose();
-                _viewshed = newViewshed;
-                mapView?.AddExploratoryAnalysis(_viewshed);
+            foreach (GraphicsLayer lyr in _dctGLViewshed.Keys.ToList()) {
+                TimeSequencingViewshed tsv = _dctGLViewshed[lyr];
+                if (tsv == null) tsv = InitializeViewshedAndViewpoints(lyr);
+                try {
+                    tsv?.ShowPrev();
+                } catch (TimeSequencingViewshedInvalidException e) {
+                    // The viewshed has probably been removed through the GUI. But we can recreate it.
+                    TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(e.Viewpoints, e.CurrentViewpointIndex, VERT_ANGLE,
+                        HORIZ_ANGLE, MIN_DIST, MAX_DIST);
+                    MapView mapView = MapView.Active;
+                    mapView?.RemoveExploratoryAnalysis(tsv); tsv.Dispose();
+                    tsv = newViewshed;
+                    mapView?.AddExploratoryAnalysis(tsv);
+                }
+                _dctGLViewshed[lyr] = tsv;
             }
+
         }
 
         internal static void OnAgentTrackAnimateViewshedButtonClick() {
             const string CHECKED_STATE = "sequencingViewshedRunning_state";
 
-            System.Diagnostics.Debug.WriteLine("Viewshed Button clicked");
+            //foreach (GraphicsLayer glyr in _dctGLViewshed.Keys.ToList()) {
             if (FrameworkApplication.State.Contains(CHECKED_STATE)) { // Stop viewshed
-                                                                      //FrameworkApplication.State.Deactivate(CHECKED_STATE);
-                _viewshed?.Stop();
+                FrameworkApplication.State.Deactivate(CHECKED_STATE);
+                foreach (TimeSequencingViewshed tsv in _dctGLViewshed.Values.ToList()) {
+                    tsv.Stop();
+                    //_viewshed?.Stop();
+                }
             } else { // Start viewshed
-                     //FrameworkApplication.State.Activate(CHECKED_STATE);
-                     // Has the viewshed been removed through other GUI means and is now invalid?
-                if (_viewshed != null && !_viewshed.IsValidAnalysisLayer) {
-                    // We could just recreate everything from scratch, but here we save time by reusing previously calculated viewpoints
-                    TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(_viewshed.Viewpoints, _viewshed.ViewpointIndex, VERT_ANGLE,
-                        HORIZ_ANGLE, MIN_DIST, MAX_DIST);
-                    MapView mapView = MapView.Active;
-                    mapView?.RemoveExploratoryAnalysis(_viewshed);
-                    _viewshed.Dispose();
-                    _viewshed = newViewshed;
-                    mapView?.AddExploratoryAnalysis(_viewshed);
-                } else 
-                    InitializeViewshedAndViewpointsIfNeeded();
-                // And finally, start the sequence
-                _viewshed?.Start();
+                FrameworkApplication.State.Activate(CHECKED_STATE);
+                foreach (GraphicsLayer glyr in _dctGLViewshed.Keys.ToList()) {
+                    if (_dctGLViewshed[glyr] == null) {
+                        TimeSequencingViewshed newViewshed = InitializeViewshedAndViewpoints(glyr);
+                        _dctGLViewshed[glyr] = newViewshed;
+                    } else if (!_dctGLViewshed[glyr].IsValidAnalysisLayer) { // Has the viewshed been removed through other GUI means and is now invalid?
+                                                                             // We could just recreate everything from scratch, but here we save time by reusing previously calculated viewpoints
+                        TimeSequencingViewshed tsvInvalid = _dctGLViewshed[glyr];
+                        TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(tsvInvalid.Viewpoints, tsvInvalid.ViewpointIndex, VERT_ANGLE,
+                            HORIZ_ANGLE, MIN_DIST, MAX_DIST);
+                        MapView mapView = MapView.Active;
+                        mapView?.RemoveExploratoryAnalysis(tsvInvalid);
+                        tsvInvalid.Dispose();
+                        mapView?.AddExploratoryAnalysis(newViewshed);
+                        _dctGLViewshed[glyr] = newViewshed;
+                    }
+                    // And finally, start the sequence
+                    _dctGLViewshed[glyr]?.Start();
+                }
             }
+            //}
+        }
+
+        /// <summary>
+        /// Clears any existing Viewshed analyses from the active map. Clears out the data structure linking
+        /// viewsheds to their agent track graphic layers.
+        /// </summary>
+        private static void ClearExistingViewsheds() {
+            foreach (TimeSequencingViewshed tsv in _dctGLViewshed.Values) {
+                if (tsv != null) {
+                    MapView.Active.RemoveExploratoryAnalysis(tsv);
+                    tsv.Dispose();
+                }
+            }
+            _dctGLViewshed.Clear();
         }
 
         /// <summary>
@@ -494,37 +524,37 @@ namespace MissionAgentReview {
         /// This is intended to be a first-time initialization; it's different from what happens if a
         /// viewshed was manually removed and then found to be missing.
         /// </summary>
-        private static void InitializeViewshedAndViewpointsIfNeeded() {
-            if (_viewshed == null) {
-                QueuedTask.Run(() => {
-                    //Create placeholder camera for now
-                    Camera cam = new Camera(0, 0, 0, 0, 0, SpatialReferences.WebMercator);
-                    _viewshed = new TimeSequencingViewshed(cam, VERT_ANGLE, HORIZ_ANGLE, MIN_DIST, MAX_DIST);
-                    MapView.Active?.AddExploratoryAnalysis(_viewshed);
-                }).Wait();
-            }
+        private static TimeSequencingViewshed InitializeViewshedAndViewpoints(GraphicsLayer glyr) {
+            Task<TimeSequencingViewshed> tskTsv = QueuedTask.Run(() => {
+                //Create placeholder camera for now
+                Camera cam = new Camera(0, 0, 0, 0, 0, SpatialReferences.WebMercator);
+                TimeSequencingViewshed tsv = new TimeSequencingViewshed(cam, VERT_ANGLE, HORIZ_ANGLE, MIN_DIST, MAX_DIST);
+                MapView.Active?.AddExploratoryAnalysis(tsv);
 
-            if (_viewshed?.Viewpoints == null) BuildViewpoints();
-            return;
+                if (tsv?.Viewpoints == null) BuildViewpoints(glyr, tsv);
+                return tsv;
+            });
+            tskTsv.Wait();
+            return tskTsv.Result;
 
-            void BuildViewpoints() {
-                if (_viewshed == null) throw new InvalidOperationException("Viewshed cannot be null when building viewpoints");
+            async void BuildViewpoints(GraphicsLayer glyrBV, TimeSequencingViewshed tsvBV) {
+                if (tsvBV == null) throw new InvalidOperationException("Viewshed cannot be null when building viewpoints");
                 MapView mapView = MapView.Active;
                 SpatialReference sr = mapView.Map.SpatialReference;
                 IReadOnlyCollection<ExploratoryAnalysis> analyses = mapView?.GetExploratoryAnalysisCollection();
                 foreach (ExploratoryAnalysis analysis in analyses) {
                     if (analysis is TimeSequencingViewshed) {
-                        _viewshed = (TimeSequencingViewshed)analysis;
+                        tsvBV = (TimeSequencingViewshed)analysis;
                         break;
                     }
                 }
                 // Now set observer points 
                 // TODO If more than one agent track layer selected, want multiple viewsheds in selected layers
                 // Because this button can only be clicked if a valid layer is selected, we don't need to do any searching
-                GraphicsLayer glyr = (GraphicsLayer)mapView.GetSelectedLayers().FirstOrDefault();
+                //GraphicsLayer glyr = (GraphicsLayer)mapView.GetSelectedLayers().FirstOrDefault();
 
-                QueuedTask.Run(() => {
-                    IReadOnlyList<GraphicElement> graphics = glyr.GetElementsAsFlattenedList();
+                await QueuedTask.Run(() => {
+                    IReadOnlyList<GraphicElement> graphics = glyrBV.GetElementsAsFlattenedList();
                     List<Camera> viewpoints = new List<Camera>();
 
                     for (int idx = 0; idx < graphics.Count; idx++) {
@@ -550,7 +580,7 @@ namespace MissionAgentReview {
                         Camera cam = ConstructCamera(pt, sr, Double.Parse(gelt.GetCustomProperty(ATTR_HEADING_AT_END)));
                         viewpoints.Add(cam);
                     }
-                    _viewshed.Viewpoints = viewpoints;
+                    tsvBV.Viewpoints = viewpoints;
 
                     Camera ConstructCamera(MapPoint pt, ArcGIS.Core.Geometry.SpatialReference srMap, double heading) {
                         MapPoint ptProj = (MapPoint)GeometryEngine.Instance.Project(pt, srMap);
@@ -565,7 +595,7 @@ namespace MissionAgentReview {
                         Camera cam = new Camera(ptProj.X, ptProj.Y, ptProj.Z, -10, fixedHeading, srMap, CameraViewpoint.LookFrom);
                         return cam;
                     }
-                }).Wait();
+                });
             }
         }
 
