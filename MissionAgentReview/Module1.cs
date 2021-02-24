@@ -357,7 +357,7 @@ namespace MissionAgentReview {
             ProgressorSource ps = new ProgressorSource("Finding avaiable Missions...", /*"Mission search canceled",*/ true);
 
             var lstMissions = await QueuedTask.Run(async () => {
-                IList<MissionTracksItem> listItems = new List<MissionTracksItem>();
+                IEnumerable<MissionTracksItem> listItems = new List<MissionTracksItem>();
 
                 PortalQueryParameters pqParams = new PortalQueryParameters("type:\"Mission\"");
                 ps.Message = "Checking active portal";
@@ -395,18 +395,20 @@ namespace MissionAgentReview {
                     // and its tracks, but won't be able to read the folder name. And since there's no Mission item in the SDK yet, we
                     // can't read its custom properties, so we won't have a friendly name for it.
                     string missionName = portalFolder != null ? portalFolder.Name : "<Mission name unavailable>";
-                    string queryString = $"ownerfolder:{folderId} AND title:Tracks";
+                    string queryString = $"ownerfolder:{folderId} AND title:Tracks_";
                     PortalQueryResultSet<PortalItem> trackFCs = await portal.SearchForContentAsync(new PortalQueryParameters(queryString));
-                    PortalItem trackFC = trackFCs.Results.FirstOrDefault();
-                    MissionTracksItem listItem = new MissionTracksItem(trackFC, missionName, trackFC.Title);
-                    listItems.Add(listItem);
+                    IEnumerable<MissionTracksItem> items = trackFCs.Results.Select<PortalItem, MissionTracksItem>((pi) => {
+                        return new MissionTracksItem(pi, missionName, pi.Title);
+                    });
+                    listItems = listItems.Concat(items);
+                    System.Diagnostics.Debug.WriteLine($"{listItems.Count()} items for {missionName}");
                 }
-                System.Diagnostics.Debug.WriteLine($"{listItems.Count} items found");
+                System.Diagnostics.Debug.WriteLine($"{listItems.Count()} items found");
                 return listItems;
             }, ps.Progressor);
 
             // If there was a problem enumerating Missions, don't show a chooser dialog
-            if (lstMissions.Count <= 0) return;
+            if (lstMissions.Count() <= 0) return;
 
             // Pass Mission items list to list dialog and show it
             DlgChooseMission dlg = new DlgChooseMission(lstMissions);

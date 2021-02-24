@@ -24,7 +24,7 @@ namespace MissionAgentReview {
         private MissionTracksItem _selectedItem;
         private IList<MissionTracksItem> _missionItems;
 
-        public DlgChooseMission(IList<MissionTracksItem> items) {
+        public DlgChooseMission(IEnumerable<MissionTracksItem> items) {
             InitializeComponent();
 
             lstMissions.ItemsSource = items;
