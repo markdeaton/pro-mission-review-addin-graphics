@@ -11,16 +11,30 @@ using System.Threading.Tasks;
 using System.Timers;
 
 namespace MissionAgentReview {
+    /// <summary>
+    /// Helper class to associate each camera viewpoint with a timestamp
+    /// (for use in time-referenced viewshed coordination)
+    /// </summary>
+    public class TSVViewpoint {
+        public TSVViewpoint(DateTime dt, Camera camera) {
+            Timestamp = dt;
+            Camera = camera;
+        }
+        public DateTime Timestamp { get;}
+        public Camera Camera { get; }
+    }
+
     public class TimeSequencingViewshed : Viewshed, IDisposable {
         public TimeSequencingViewshed(TimeSequencingViewshed tsv) : base(tsv) {
             _timer.Elapsed += OnIntervalElapsed;
         }
-        public TimeSequencingViewshed(Camera observer, double verticalAngle, double horizontalAngle, double minimumDistance, double maximumDistance)
-                               : base(observer, verticalAngle, horizontalAngle, minimumDistance, maximumDistance) {
+        // Constructor with dummy camera
+        public TimeSequencingViewshed(SpatialReference sr, double verticalAngle, double horizontalAngle, double minimumDistance, double maximumDistance)
+                               : base(new Camera(0, 0, 0, 0, 0, sr), verticalAngle, horizontalAngle, minimumDistance, maximumDistance) {
             _timer.Elapsed += OnIntervalElapsed;
         }
-        public TimeSequencingViewshed(IList<Camera> locations, int idxLocation, double verticalAngle, double horizontalAngle, double minimumDistance, double maximumDistance)
-                                : base(locations[idxLocation], verticalAngle, horizontalAngle, minimumDistance, maximumDistance) {
+        public TimeSequencingViewshed(IList<TSVViewpoint> locations, int idxLocation, double verticalAngle, double horizontalAngle, double minimumDistance, double maximumDistance)
+                                : base(locations[idxLocation].Camera, verticalAngle, horizontalAngle, minimumDistance, maximumDistance) {
             _viewpoints = locations;
             _viewpointIndex = idxLocation;
             _timer.Elapsed += OnIntervalElapsed;
@@ -40,7 +54,7 @@ namespace MissionAgentReview {
 
         private Timer _timer = new Timer() { AutoReset = true, Interval = 2000 };
         /// <summary>
-        /// How long he animation will pause with a viewshed analysis at each agent trackpoint
+        /// How long the animation will pause with a viewshed analysis at each agent trackpoint
         /// </summary>
         /// <remarks>Default value is 2000 ms</remarks>
         public double DwellTimeMs {
@@ -52,11 +66,11 @@ namespace MissionAgentReview {
         /// Keeps a record of the location currently showing a viewshed; intended for use in stopping and starting the timer.
         /// </summary>
         private int _viewpointIndex = -1;
-        private IList<Camera> _viewpoints;
+        private IList<TSVViewpoint> _viewpoints;
         /// <summary>
         /// The agent trackpoint camera viewpoints at which to sequentially generate viewpoints
         /// </summary>
-        public IList<Camera> Viewpoints {
+        public IList<TSVViewpoint> Viewpoints {
             get { return _viewpoints; }
             set { _viewpoints = value; }
         }
@@ -93,7 +107,7 @@ namespace MissionAgentReview {
                 _viewpointIndex++;
                 if (_viewpointIndex < 0 || _viewpointIndex > Viewpoints?.Count - 1) _viewpointIndex = 0;
 
-                this.SetObserver(Viewpoints?[_viewpointIndex]);
+                this.SetObserver(Viewpoints?[_viewpointIndex]?.Camera);
             } catch (InvalidOperationException e) {
                 throw new TimeSequencingViewshedInvalidException("Error in viewshed ShowNext", e, _viewpoints, _viewpointIndex);
             }
@@ -103,7 +117,7 @@ namespace MissionAgentReview {
                 _viewpointIndex--;
                 if (_viewpointIndex > Viewpoints?.Count - 1 || _viewpointIndex < 0) _viewpointIndex = Viewpoints.Count - 1;
 
-                this.SetObserver(Viewpoints?[_viewpointIndex]);
+                this.SetObserver(Viewpoints?[_viewpointIndex]?.Camera);
             } catch (InvalidOperationException e) {
                 Stop();
                 throw new TimeSequencingViewshedInvalidException("Error in viewshed ShowPrev", e, _viewpoints, _viewpointIndex);

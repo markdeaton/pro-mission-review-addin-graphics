@@ -19,7 +19,7 @@ namespace MissionAgentReview.Exceptions {
         /// <param name="viewpoints">The locations/viewpoints list from the original TimeSequencingViewshed that unexpectedly disappeared</param>
         /// <param name="viewpoints_idx">The index of the location viewpoint that was active at the time the viewshed became unavailable</param>
         public TimeSequencingViewshedInvalidException(string msg, InvalidOperationException exc, 
-            IList<Camera> viewpoints, int viewpoints_idx) : base(msg, exc) {
+            IList<TSVViewpoint> viewpoints, int viewpoints_idx) : base(msg, exc) {
 
             Data.Add(DATA_VIEWPOINTS_LIST, viewpoints);
             Data.Add(DATA_VIEWPOINTS_IDX, viewpoints_idx);
@@ -28,9 +28,9 @@ namespace MissionAgentReview.Exceptions {
         /// <summary>
         /// The locations/viewpoints list from the original TimeSequencingViewshed that unexpectedly disappeared
         /// </summary>
-        public IList<Camera> Viewpoints {
+        public IList<TSVViewpoint> Viewpoints {
             get {
-                return (IList<Camera>) Data[DATA_VIEWPOINTS_LIST];
+                return (IList<TSVViewpoint>) Data[DATA_VIEWPOINTS_LIST];
             }
         }
 

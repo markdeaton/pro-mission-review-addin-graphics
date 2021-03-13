@@ -211,7 +211,8 @@ namespace MissionAgentReview {
 
                     // Create polylines between tracks, symbolized with arrows
                     using (RowCursor rowCur = _agentTracksFeatureLayer.Search(agentTracksQF)) {
-                        MapPoint prevPt = null; double? prevCourse = null; /*DateTime? prevPtCreateDT = null;*/ DateTime? prevPtTimestamp = null;
+                        // Use timestamp rather than createDate because it seems to be less affected by device time differences
+                        MapPoint prevPt = null; double? prevCourse = null; DateTime? prevPtTimestamp = null;
                         IList<CIMLineGraphic> pathGraphics = new List<CIMLineGraphic>();
                         CIMPointGraphic startGraphic = null, endGraphic = null;
 
@@ -226,7 +227,7 @@ namespace MissionAgentReview {
                                 // Workaround to detect duplicate points that somehow strangely make it into collected tracks data
                                 // Strangely, they're a few milliseconds apart, so using the string representation lets us filter them out the way we want
                                 bool isDuplicatePoint = pt.X == prevPt?.X && pt.Y == prevPt?.Y &&
-                                    (feat[/*FIELD_CREATEDATETIME*/FIELD_TIMESTAMP] as DateTime?).ToString() == prevPtTimestamp?.ToString();
+                                    (feat[FIELD_TIMESTAMP] as DateTime?).ToString() == prevPtTimestamp?.ToString();
 
                                 if (prevPt == null) { // Create start graphic
                                     startGraphic = CreateAgentStartGraphic(pt);
@@ -239,7 +240,7 @@ namespace MissionAgentReview {
 
                                     pathGraphics.Add(graphic);
                                 }
-                                prevPt = pt; prevCourse = currCourse; /*prevPtCreateDT = feat[FIELD_CREATEDATETIME] as DateTime?;*/ prevPtTimestamp = feat[FIELD_TIMESTAMP] as DateTime?;
+                                prevPt = pt; prevCourse = currCourse; prevPtTimestamp = feat[FIELD_TIMESTAMP] as DateTime?;
                             }
                         }
                         System.Diagnostics.Debug.WriteLine($"{pathGraphics.Count} lines created");
@@ -380,12 +381,9 @@ namespace MissionAgentReview {
                 }
                 // Now we should have all missions available
                 System.Diagnostics.Debug.WriteLine($"{missions.Count} missions found");
-                if (missions.Count <= 0) {
-                    MessageBox.Show("No available Missions could be found.");
-                    return listItems;
-                }
 
                 // For each mission, we run a query for a feature service named like "Tracks_" in the mission's folder
+                // If no missions found, skip this and return an empty list
                 foreach (PortalItem mission in missions) {
                     //string metadata = mission.GetXml(); // Doesn't give us the mission name we need
                     string folderId = mission.FolderID;
@@ -395,7 +393,7 @@ namespace MissionAgentReview {
                     // and its tracks, but won't be able to read the folder name. And since there's no Mission item in the SDK yet, we
                     // can't read its custom properties, so we won't have a friendly name for it.
                     string missionName = portalFolder != null ? portalFolder.Name : "<Mission name unavailable>";
-                    string queryString = $"ownerfolder:{folderId} AND title:Tracks_";
+                    string queryString = $"ownerfolder:{folderId} AND title:Tracks_ AND type:Feature";
                     PortalQueryResultSet<PortalItem> trackFCs = await portal.SearchForContentAsync(new PortalQueryParameters(queryString));
                     IEnumerable<MissionTracksItem> items = trackFCs.Results.Select<PortalItem, MissionTracksItem>((pi) => {
                         return new MissionTracksItem(pi, missionName, pi.Title);
@@ -408,7 +406,10 @@ namespace MissionAgentReview {
             }, ps.Progressor);
 
             // If there was a problem enumerating Missions, don't show a chooser dialog
-            if (lstMissions.Count() <= 0) return;
+            if (lstMissions.Count() <= 0) {
+                MessageBox.Show("No available Missions could be found.");
+                return;
+            }
 
             // Pass Mission items list to list dialog and show it
             DlgChooseMission dlg = new DlgChooseMission(lstMissions);
@@ -529,8 +530,8 @@ namespace MissionAgentReview {
         private static TimeSequencingViewshed InitializeViewshedAndViewpoints(GraphicsLayer glyr) {
             Task<TimeSequencingViewshed> tskTsv = QueuedTask.Run(() => {
                 //Create placeholder camera for now
-                Camera cam = new Camera(0, 0, 0, 0, 0, SpatialReferences.WebMercator);
-                TimeSequencingViewshed tsv = new TimeSequencingViewshed(cam, VERT_ANGLE, HORIZ_ANGLE, MIN_DIST, MAX_DIST);
+                //Camera cam = new Camera(0, 0, 0, 0, 0, SpatialReferences.WebMercator);
+                TimeSequencingViewshed tsv = new TimeSequencingViewshed(MapView.Active.Map.SpatialReference, VERT_ANGLE, HORIZ_ANGLE, MIN_DIST, MAX_DIST);
                 MapView.Active?.AddExploratoryAnalysis(tsv);
 
                 if (tsv?.Viewpoints == null) BuildViewpoints(glyr, tsv);
@@ -553,11 +554,10 @@ namespace MissionAgentReview {
                 // Now set observer points 
                 // TODO If more than one agent track layer selected, want multiple viewsheds in selected layers
                 // Because this button can only be clicked if a valid layer is selected, we don't need to do any searching
-                //GraphicsLayer glyr = (GraphicsLayer)mapView.GetSelectedLayers().FirstOrDefault();
 
                 await QueuedTask.Run(() => {
                     IReadOnlyList<GraphicElement> graphics = glyrBV.GetElementsAsFlattenedList();
-                    List<Camera> viewpoints = new List<Camera>();
+                    List<TSVViewpoint> viewpoints = new List<TSVViewpoint>();
 
                     for (int idx = 0; idx < graphics.Count; idx++) {
                         GraphicElement gelt = graphics[idx];
@@ -575,12 +575,12 @@ namespace MissionAgentReview {
                         if (gelt == graphics.First() && !String.IsNullOrEmpty(gelt.GetCustomProperty(ATTR_HEADING_AT_START))) {
                             MapPoint ptFirst = line.Points.First();
                             Camera cam1 = ConstructCamera(ptFirst, sr, Double.Parse(gelt.GetCustomProperty(ATTR_HEADING_AT_START)));
-                            viewpoints.Add(cam1);
+                            viewpoints.Add(new TSVViewpoint((DateTime)gelt.GetGraphic().Attributes[FIELD_TIMESTAMP], cam1));
                         }
                         // Add the endpoint as viewshed camera
                         MapPoint pt = line.Points.Last();
                         Camera cam = ConstructCamera(pt, sr, Double.Parse(gelt.GetCustomProperty(ATTR_HEADING_AT_END)));
-                        viewpoints.Add(cam);
+                        viewpoints.Add(new TSVViewpoint((DateTime)gelt.GetGraphic().Attributes[FIELD_TIMESTAMP], cam));
                     }
                     tsvBV.Viewpoints = viewpoints;
 
