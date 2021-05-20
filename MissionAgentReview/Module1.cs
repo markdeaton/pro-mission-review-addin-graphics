@@ -385,15 +385,27 @@ namespace MissionAgentReview {
                 // For each mission, we run a query for a feature service named like "Tracks_" in the mission's folder
                 // If no missions found, skip this and return an empty list
                 foreach (PortalItem mission in missions) {
+                    string queryString;
                     //string metadata = mission.GetXml(); // Doesn't give us the mission name we need
                     string folderId = mission.FolderID;
+                    
                     // Construct PortalFolder to get folder name for display as name of mission
                     Item portalFolder = ItemFactory.Instance.Create(folderId, ItemFactory.ItemType.PortalFolderItem);
                     // The Mission and its folder could be owned by someone else but shared. In that case, we can get to the Mission
                     // and its tracks, but won't be able to read the folder name. And since there's no Mission item in the SDK yet, we
                     // can't read its custom properties, so we won't have a friendly name for it.
-                    string missionName = portalFolder != null ? portalFolder.Name : "<Mission name unavailable>";
-                    string queryString = $"ownerfolder:{folderId} AND title:Tracks_ AND type:Feature";
+                    //string missionName = portalFolder != null ? portalFolder.Name : "<Mission name unavailable>";
+                    // Alternate: get Mission Map; its Description contains the Mission name
+                    const String MAP_DESC_PREAMBLE = "A map for mission "; // What to look for in the Mission Map Description
+                    queryString = $"ownerfolder:{folderId} AND type:\"Map\" AND title:\"MissionMap_{folderId}\"";
+                    PortalQueryResultSet<PortalItem> missionMaps = await portal.SearchForContentAsync(new PortalQueryParameters(queryString));
+                    PortalItem missionMap = missionMaps.Results.FirstOrDefault();
+                    String missionMapDesc = !String.IsNullOrEmpty(missionMap.Description) ? missionMap.Description : "<Mission name unavailable>";
+                    int mapDescPreambleEndLoc = missionMapDesc.IndexOf(MAP_DESC_PREAMBLE) + MAP_DESC_PREAMBLE.Length;
+                    String missionName = missionMapDesc.Substring(mapDescPreambleEndLoc, missionMapDesc.Length - mapDescPreambleEndLoc);
+
+                    // Grab the tracks feature service
+                    queryString = $"ownerfolder:{folderId} AND title:Tracks_ AND type:Feature";
                     PortalQueryResultSet<PortalItem> trackFCs = await portal.SearchForContentAsync(new PortalQueryParameters(queryString));
                     IEnumerable<MissionTracksItem> items = trackFCs.Results.Select<PortalItem, MissionTracksItem>((pi) => {
                         return new MissionTracksItem(pi, missionName, pi.Title);

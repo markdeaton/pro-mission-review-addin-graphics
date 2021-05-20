@@ -76,7 +76,7 @@
         <group id="MissionReview_GenerateTracks_Group" caption="Find Agent Tracks" appearsOnAddInTab="false">
           <!-- host controls within groups -->
           <button refID="AgentTracksBrowse_Button" size="large" />
-          <comboBox refID="MissionAgentReviewAgents_Combo" size="large" />
+          <comboBox refID="MissionAgentReviewAgents_Combo" size="large" separator="true"/>
         </group>
         <!-- Line of sight analysis tools -->
         <group id="MissionReview_LOS_Group" caption="Sightline Analysis" appearsOnAddInTab="false">
@@ -92,7 +92,8 @@
           <tooltip heading="Tracks Dataset">Select an agent tracks dataset to add to the map</tooltip>
         </button>
         <!-- Combo Box that holds the list of agents -->
-        <comboBox id="MissionAgentReviewAgents_Combo" caption="Mission Agents:" className="AgentsCombo" condition="AgentTrackGeneratorListEnabled_Condition" itemWidth="140" extendedCaption="Choose from this list of agents to examine an agent's path during the mission." isEditable="false" isReadOnly="true" resizable="true" editHint="No agent selected">
+        <comboBox id="MissionAgentReviewAgents_Combo" caption="Agents:" className="AgentsCombo" condition="AgentTrackGeneratorListEnabled_Condition" itemWidth="140" extendedCaption="Choose from this list of agents to examine an agent's path during the mission." 
+                  isEditable="false" isReadOnly="true" resizable="true" editHint="No agent selected">
           <tooltip heading="Agent track">Choose an agent to generate a mission track<disabledText>Select an agent track layer</disabledText></tooltip>
         </comboBox>
         <!-- Viewshed button -->
