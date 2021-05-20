@@ -1,5 +1,5 @@
 ﻿<ArcGIS defaultAssembly="MissionAgentReview.dll" defaultNamespace="MissionAgentReview" xmlns="http://schemas.esri.com/DADF/Registry" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schemas.esri.com/DADF/Registry file:///C:/Program%20Files/ArcGIS/Pro/bin/ArcGIS.Desktop.Framework.xsd">
-  <AddInInfo id="{f12e418e-62f8-4094-b867-f8b3220ee73d}" version="0.75" desktopVersion="2.7.0">
+  <AddInInfo id="{f12e418e-62f8-4094-b867-f8b3220ee73d}" version="0.75" desktopVersion="2.7">
     <Name>MissionAgentReview</Name>
     <Description>ArcGIS Mission Post-Review Tools</Description>
     <Image>Images\AddinDesktop32.png</Image>
@@ -97,15 +97,15 @@
         </comboBox>
         <!-- Viewshed button -->
         <button id="AgentTracksViewshed_Button" className="MissionAgentReview_Module:OnAgentTrackAnimateViewshedButtonClick" caption="Viewshed Sequence" loadOnClick="false" condition="LOSToolsEnabled_Condition" checkedCondition="SequencingViewshedRunning_Condition" largeImage="Images\viewshed_play.png" smallImage="Images\viewshed_play_16.png">
-          <tooltip>Generate a viewshed for selected agents' tracks<disabledText>Select one or more agent track line result layers</disabledText></tooltip>
+          <tooltip>Generate a viewshed for selected agents' tracks<disabledText>In a Scene 3D view, select one or more agent path graphics layers</disabledText></tooltip>
         </button>
         <button id="AgentTracksViewshedNext_Button" className="MissionAgentReview_Module:OnAgentTrackViewshedNextButtonClick" caption="Next Viewshed" loadOnClick="false" condition="ViewshedNextEnabled_Condition" largeImage="Images\viewshed_next_32.png" smallImage="Images\viewshed_next_16.png">
           <tooltip>
-            Generate a viewshed for next sequence in selected agents' tracks<disabledText>Select one or more agent track line result layers</disabledText></tooltip>
+            Generate a viewshed for next sequence in selected agents' tracks<disabledText>In a Scene 3D view, select one or more agent path graphics layers</disabledText></tooltip>
         </button>
         <button id="AgentTracksViewshedPrev_Button" className="MissionAgentReview_Module:OnAgentTrackViewshedPrevButtonClick" caption="Previous Viewshed" loadOnClick="false" condition="ViewshedNextEnabled_Condition" largeImage="Images\viewshed_prev_32.png" smallImage="Images\viewshed_prev_16.png">
           <tooltip>
-            Generate a viewshed for previous sequence in selected agents' tracks<disabledText>Select one or more agent track line result layers</disabledText></tooltip>
+            Generate a viewshed for previous sequence in selected agents' tracks<disabledText>In a Scene 3D view, select one or more agent path graphics layers</disabledText></tooltip>
         </button>
       </controls>
     </insertModule>
