@@ -1,5 +1,5 @@
 ﻿<ArcGIS defaultAssembly="MissionAgentReview.dll" defaultNamespace="MissionAgentReview" xmlns="http://schemas.esri.com/DADF/Registry" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schemas.esri.com/DADF/Registry file:///C:/Program%20Files/ArcGIS/Pro/bin/ArcGIS.Desktop.Framework.xsd">
-  <AddInInfo id="{f12e418e-62f8-4094-b867-f8b3220ee73d}" version="0.75" desktopVersion="2.7">
+  <AddInInfo id="{f12e418e-62f8-4094-b867-f8b3220ee73d}" version="0.76" desktopVersion="2.7">
     <Name>MissionAgentReview</Name>
     <Description>ArcGIS Mission Post-Review Tools</Description>
     <Image>Images\AddinDesktop32.png</Image>

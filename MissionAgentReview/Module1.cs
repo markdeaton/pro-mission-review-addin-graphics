@@ -429,7 +429,7 @@ namespace MissionAgentReview {
             if (result ?? false) {
                 // Do something with chosen item
                 MissionTracksItem item = dlg.SelectedItem;
-                await QueuedTask.Run(() => LayerFactory.Instance.CreateLayer(item.PortalItem, MapView.Active.Map, layerName:item.MissionName));
+                await QueuedTask.Run(() => LayerFactory.Instance.CreateFeatureLayer(item.PortalItem, MapView.Active.Map, layerName:item.MissionName));
             }
             //else canceled
 
