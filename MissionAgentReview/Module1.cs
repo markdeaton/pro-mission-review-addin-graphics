@@ -388,7 +388,8 @@ namespace MissionAgentReview {
                     string queryString;
                     //string metadata = mission.GetXml(); // Doesn't give us the mission name we need
                     string folderId = mission.FolderID;
-                    
+                    if (String.IsNullOrWhiteSpace(folderId)) continue;
+
                     // Construct PortalFolder to get folder name for display as name of mission
                     Item portalFolder = ItemFactory.Instance.Create(folderId, ItemFactory.ItemType.PortalFolderItem);
                     // The Mission and its folder could be owned by someone else but shared. In that case, we can get to the Mission
