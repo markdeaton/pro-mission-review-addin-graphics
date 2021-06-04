@@ -355,6 +355,7 @@ namespace MissionAgentReview {
         /// Handler for Select Agent Tracks dataset button click
         /// </summary>
         internal static async void OnAgentTracksBrowseButtonClick() {
+            bool isDemoMode = false; // In certain demo circumstances, we'll use hardcoded choices
             ProgressorSource ps = new ProgressorSource("Finding avaiable Missions...", /*"Mission search canceled",*/ true);
 
             var lstMissions = await QueuedTask.Run(async () => {
@@ -382,9 +383,16 @@ namespace MissionAgentReview {
                 // Now we should have all missions available
                 System.Diagnostics.Debug.WriteLine($"{missions.Count} missions found");
 
+                // If we can't get the folder ID for any found mission item, we don't have access
+                // If we're also on the demo portal, go into demo mode with hardcoded mission info
+                isDemoMode = missions.All(pi => String.IsNullOrWhiteSpace(pi.FolderID))
+                        && portal.PortalUri.ToString().ToLower() == Properties.Settings.Default.DemoPortalUri.ToLower();
+                if (isDemoMode) {
+                    listItems = await GetDemoMissions(portal);
+                }
                 // For each mission, we run a query for a feature service named like "Tracks_" in the mission's folder
                 // If no missions found, skip this and return an empty list
-                foreach (PortalItem mission in missions) {
+                else foreach (PortalItem mission in missions) {
                     string queryString;
                     //string metadata = mission.GetXml(); // Doesn't give us the mission name we need
                     string folderId = mission.FolderID;
@@ -408,7 +416,7 @@ namespace MissionAgentReview {
                     // Grab the tracks feature service
                     queryString = $"ownerfolder:{folderId} AND title:Tracks_ AND type:Feature";
                     PortalQueryResultSet<PortalItem> trackFCs = await portal.SearchForContentAsync(new PortalQueryParameters(queryString));
-                    IEnumerable<MissionTracksItem> items = trackFCs.Results.Select<PortalItem, MissionTracksItem>((pi) => {
+                    IEnumerable<MissionTracksItem> items = trackFCs.Results.Select<PortalItem, MissionTracksItem>(pi => {
                         return new MissionTracksItem(pi, missionName, pi.Title);
                     });
                     listItems = listItems.Concat(items);
@@ -416,6 +424,19 @@ namespace MissionAgentReview {
                 }
                 System.Diagnostics.Debug.WriteLine($"{listItems.Count()} items found");
                 return listItems;
+
+                async Task<List<MissionTracksItem>> GetDemoMissions(ArcGISPortal demoPortal) {
+                    List<MissionTracksItem> demoMissions = new List<MissionTracksItem>();
+                    PortalQueryResultSet<PortalItem> demoFSvcs;
+                    
+                    demoFSvcs = await demoPortal.SearchForContentAsync(PortalQueryParameters.CreateForItemsWithId("c1e6de554a5f4b7e9e145595b8a37dc2"));
+                    demoMissions.Add(new MissionTracksItem(demoFSvcs.Results.FirstOrDefault(), "Esri Incident Patrol", "Incident Patrol Tracks"));
+
+                    demoFSvcs = await demoPortal.SearchForContentAsync(PortalQueryParameters.CreateForItemsWithId("87c762dfa3c74f07b08a46d2843cd9a2"));
+                    demoMissions.Add(new MissionTracksItem(demoFSvcs.Results.FirstOrDefault(), "Esri Perimeter Patrol", "Perimeter Patrol Tracks"));
+
+                    return demoMissions;
+                }
             }, ps.Progressor);
 
             // If there was a problem enumerating Missions, don't show a chooser dialog
@@ -425,7 +446,7 @@ namespace MissionAgentReview {
             }
 
             // Pass Mission items list to list dialog and show it
-            DlgChooseMission dlg = new DlgChooseMission(lstMissions);
+            DlgChooseMission dlg = new DlgChooseMission(lstMissions, isDemoMode);
             bool? result = dlg.ShowDialog();
             if (result ?? false) {
                 // Do something with chosen item

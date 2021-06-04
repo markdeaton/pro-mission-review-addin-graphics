@@ -24,10 +24,12 @@ namespace MissionAgentReview {
         private MissionTracksItem _selectedItem;
         private IList<MissionTracksItem> _missionItems;
 
-        public DlgChooseMission(IEnumerable<MissionTracksItem> items) {
+        public DlgChooseMission(IEnumerable<MissionTracksItem> items, bool isDemoMode = false) {
             InitializeComponent();
 
             lstMissions.ItemsSource = items;
+
+            if (isDemoMode) Title += " [DM]";
         }
 
         public bool IsListItemSelected { 
