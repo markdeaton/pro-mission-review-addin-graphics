@@ -6,7 +6,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:extensions="clr-namespace:ArcGIS.Desktop.Extensions;assembly=ArcGIS.Desktop.Extensions"
         mc:Ignorable="d"
-        Title="Choose a Mission…" Height="310.457" Width="577.554"
+        Title="Choose a Mission" Height="310.457" Width="577.554"
         WindowStartupLocation="CenterOwner"
     >
     <controls:ProWindow.Resources>
