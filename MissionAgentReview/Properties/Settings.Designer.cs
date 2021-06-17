@@ -25,7 +25,7 @@ namespace MissionAgentReview.Properties {
         
         [global::System.Configuration.ApplicationScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("https://geoxc-ent2.bd.esri.com/portal/")]
+        [global::System.Configuration.DefaultSettingValueAttribute("https://publicsafety.bd.esri.com/portal/")]
         public string DemoPortalUri {
             get {
                 return ((string)(this["DemoPortalUri"]));

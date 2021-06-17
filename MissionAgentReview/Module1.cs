@@ -429,11 +429,11 @@ namespace MissionAgentReview {
                     List<MissionTracksItem> demoMissions = new List<MissionTracksItem>();
                     PortalQueryResultSet<PortalItem> demoFSvcs;
                     
-                    demoFSvcs = await demoPortal.SearchForContentAsync(PortalQueryParameters.CreateForItemsWithId("c1e6de554a5f4b7e9e145595b8a37dc2"));
-                    demoMissions.Add(new MissionTracksItem(demoFSvcs.Results.FirstOrDefault(), "Esri Incident Patrol", "Incident Patrol Tracks"));
+                    demoFSvcs = await demoPortal.SearchForContentAsync(PortalQueryParameters.CreateForItemsWithId("c7c5a1774b22415aa12aa6399ca9d6e4"));
+                    demoMissions.Add(new MissionTracksItem(demoFSvcs.Results.FirstOrDefault(), "Incident Patrol", "Incident Patrol Tracks"));
 
-                    demoFSvcs = await demoPortal.SearchForContentAsync(PortalQueryParameters.CreateForItemsWithId("87c762dfa3c74f07b08a46d2843cd9a2"));
-                    demoMissions.Add(new MissionTracksItem(demoFSvcs.Results.FirstOrDefault(), "Esri Perimeter Patrol", "Perimeter Patrol Tracks"));
+                    demoFSvcs = await demoPortal.SearchForContentAsync(PortalQueryParameters.CreateForItemsWithId("e2b9a6e184964e9ab1aa73b393230f49"));
+                    demoMissions.Add(new MissionTracksItem(demoFSvcs.Results.FirstOrDefault(), "Perimeter Patrol", "Perimeter Patrol Tracks"));
 
                     return demoMissions;
                 }

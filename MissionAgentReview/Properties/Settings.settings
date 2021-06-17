@@ -3,7 +3,7 @@
   <Profiles />
   <Settings>
     <Setting Name="DemoPortalUri" Type="System.String" Scope="Application">
-      <Value Profile="(Default)">https://geoxc-ent2.bd.esri.com/portal/</Value>
+      <Value Profile="(Default)">https://publicsafety.bd.esri.com/portal/</Value>
     </Setting>
   </Settings>
 </SettingsFile>
