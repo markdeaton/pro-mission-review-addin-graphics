@@ -22,15 +22,11 @@ namespace MissionAgentReview {
             if (isDemoMode) Title += " [DM]";
         }
 
-        public bool IsListItemSelected { 
-            get => _isListItemSelected; 
-            set => _isListItemSelected = value; 
-        }
         public MissionItemDetails SelectedItem { 
             get => _selectedItem;
             set {
                 _selectedItem = value;
-                IsListItemSelected = _selectedItem != null;
+                btnOK.IsEnabled = SelectedItem != null;
             }
         }
 

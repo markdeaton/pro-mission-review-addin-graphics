@@ -402,12 +402,14 @@ namespace MissionAgentReview {
                         int mapDescPreambleEndLoc = map.Description.IndexOf(MAP_DESC_PREAMBLE) + MAP_DESC_PREAMBLE.Length;
                         String missionName = map.Description.Substring(mapDescPreambleEndLoc, map.Description.Length - mapDescPreambleEndLoc);
 
-                        missions.Add(new MissionItemDetails() {
+                        MissionItemDetails missionDetails = new MissionItemDetails() {
                             MissionName = missionName,
                             Group = group,
                             MissionItem = mission,
                             TracksItem = tracks
-                        });
+                        };
+
+                        if (!missions.Contains(missionDetails)) missions.Add(missionDetails);
                     }
                 }
                 // Now we should have all missions available
