@@ -29,7 +29,7 @@
                             <GridViewColumnHeader Click="GridViewColumnHeader_Click">Mission</GridViewColumnHeader>
                         </GridViewColumn.Header>
                     </GridViewColumn>
-                    <GridViewColumn DisplayMemberBinding="{Binding Path='TrackFCTitle'}" Width="Auto">
+                    <GridViewColumn DisplayMemberBinding="{Binding Path='TracksItem.Title'}" Width="Auto">
                         <GridViewColumn.Header>
                             <GridViewColumnHeader Click="GridViewColumnHeader_Click">Tracks Feature Class</GridViewColumnHeader>
                         </GridViewColumn.Header>

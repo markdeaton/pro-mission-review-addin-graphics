@@ -1,19 +1,9 @@
 ﻿using MissionAgentReview.datatypes;
-using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
 namespace MissionAgentReview {
     /// <summary>
@@ -21,10 +11,10 @@ namespace MissionAgentReview {
     /// </summary>
     public partial class DlgChooseMission : ArcGIS.Desktop.Framework.Controls.ProWindow {
         private bool _isListItemSelected = false;
-        private MissionTracksItem _selectedItem;
-        private IList<MissionTracksItem> _missionItems;
+        private MissionItemDetails _selectedItem;
+        private IList<MissionItemDetails> _missionItems;
 
-        public DlgChooseMission(IEnumerable<MissionTracksItem> items, bool isDemoMode = false) {
+        internal DlgChooseMission(IEnumerable<MissionItemDetails> items, bool isDemoMode = false) {
             InitializeComponent();
 
             lstMissions.ItemsSource = items;
@@ -36,7 +26,7 @@ namespace MissionAgentReview {
             get => _isListItemSelected; 
             set => _isListItemSelected = value; 
         }
-        public MissionTracksItem SelectedItem { 
+        public MissionItemDetails SelectedItem { 
             get => _selectedItem;
             set {
                 _selectedItem = value;
@@ -44,7 +34,7 @@ namespace MissionAgentReview {
             }
         }
 
-        public IList<MissionTracksItem> MissionItems { get => _missionItems; set => _missionItems = value; }
+        public IList<MissionItemDetails> MissionItems { get => _missionItems; set => _missionItems = value; }
 
         private void OK_Click(object sender, RoutedEventArgs e) {
             // Set selected item
@@ -52,7 +42,7 @@ namespace MissionAgentReview {
         }
 
         private void LstMissions_SelectionChanged(object sender, SelectionChangedEventArgs e) {
-            SelectedItem = (MissionTracksItem)e.AddedItems[0];
+            SelectedItem = (MissionItemDetails)e.AddedItems[0];
         }
 
         #region Column Sorting

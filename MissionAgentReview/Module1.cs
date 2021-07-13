@@ -22,6 +22,7 @@ using ArcGIS.Desktop.Core.Portal;
 using ArcGIS.Desktop.Core;
 using MissionAgentReview.datatypes;
 using ArcGIS.Desktop.Framework.Dialogs;
+using Newtonsoft.Json.Linq;
 
 namespace MissionAgentReview {
     internal class Module1 : Module {
@@ -359,73 +360,64 @@ namespace MissionAgentReview {
             ProgressorSource ps = new ProgressorSource("Finding avaiable Missions...", /*"Mission search canceled",*/ true);
 
             var lstMissions = await QueuedTask.Run(async () => {
-                IEnumerable<MissionTracksItem> listItems = new List<MissionTracksItem>();
+                //IEnumerable<MissionTracksItem> listItems = new List<MissionTracksItem>();
+                IList<MissionItemDetails> missions = new List<MissionItemDetails>();
 
-                PortalQueryParameters pqParams = new PortalQueryParameters("type:\"Mission\"");
                 ps.Message = "Checking active portal";
                 ArcGISPortal portal = ArcGISPortalManager.Current.GetActivePortal();
                 ps.Message = $"Connecting to {portal.PortalUri}";
                 if (!portal.IsSignedOn()) {
                     //if (!portal.SignIn().success) {
-                        MessageBox.Show("You must be signed into a portal for this. Please do so before trying to open a Mission.");
-                        return listItems;
+                    MessageBox.Show("You must be signed into a portal for this. Please do so before trying to open a Mission.");
+                    return missions;
                 }
 
                 ps.Message = "Finding available Missions...";
-                IList<PortalItem> missions = new List<PortalItem>();
-                while (pqParams != null) { // We're forced to deal with a results paging mechanism
-                    PortalQueryResultSet<PortalItem> portalItems = await portal.SearchForContentAsync(pqParams);
-                    System.Diagnostics.Debug.WriteLine($"{portalItems.Results.Count} items found");
-                    foreach (PortalItem portalItem in portalItems.Results) missions.Add(portalItem);
 
-                    pqParams = portalItems.NextQueryParameters;
+
+                /// Find important information about a Mission.
+                /// This isn't straightforward, because the name given a Mission during setup isn't the same as the title the Mission item gets.
+                /// Here we search the user's groups to find which ones contain Mission items; then look for associated items and info within that group.
+                /// Potential flaw: if someone went and put the user and a Mission into a second group without also adding associated feature services
+                /// (tracks) to the new group, this may fail to find the proper information.
+
+                // Get user's groups
+                IReadOnlyList<PortalGroup> groups = await portal.GetGroupsFromUserAsync(portal.GetSignOnUsername());
+                foreach (PortalGroup group in groups) {
+                    IEnumerable<Item> items = group.GetItems();
+                    // Mission, Map, Tracks features exist?
+                    Func<Item, bool> qryMission = itm => itm.Type == "Mission";
+                    Func<Item, bool> qryWebMap = itm => itm.Type == "Web Map";
+                    Func<Item, bool> qryTracks = itm => itm.Type == "Feature Service" && itm.Title.StartsWith("Tracks_");
+                    if ( items.Any<Item>(qryMission) && items.Any<Item>(qryWebMap) && items.Any<Item>(qryTracks) ) {
+
+                        // Find the Mission, Mission Map, and Tracks feature service in this group
+                        PortalItem mission = items.Where(qryMission).FirstOrDefault() as PortalItem;
+                        PortalItem map = items.Where(qryWebMap).FirstOrDefault() as PortalItem;
+                        PortalItem tracks = items.Where(qryTracks).FirstOrDefault() as PortalItem;
+
+                        // Only the Folder and the Map have the Mission's name, and we don't always get access to the Folder
+                        // We need to remove extraneous text from the front of the Map description first, though...
+                        const String MAP_DESC_PREAMBLE = "A map for mission "; // What to look for in the Mission Map Description
+                        int mapDescPreambleEndLoc = map.Description.IndexOf(MAP_DESC_PREAMBLE) + MAP_DESC_PREAMBLE.Length;
+                        String missionName = map.Description.Substring(mapDescPreambleEndLoc, map.Description.Length - mapDescPreambleEndLoc);
+
+                        missions.Add(new MissionItemDetails() {
+                            MissionName = missionName,
+                            Group = group,
+                            MissionItem = mission,
+                            TracksItem = tracks
+                        });
+                    }
                 }
                 // Now we should have all missions available
                 System.Diagnostics.Debug.WriteLine($"{missions.Count} missions found");
 
-                // If we can't get the folder ID for any found mission item, we don't have access
-                // If we're also on the demo portal, go into demo mode with hardcoded mission info
-                isDemoMode = missions.All(pi => String.IsNullOrWhiteSpace(pi.FolderID))
-                        && portal.PortalUri.ToString().ToLower() == Properties.Settings.Default.DemoPortalUri.ToLower();
-                if (isDemoMode) {
-                    listItems = await GetDemoMissions(portal);
-                }
-                // For each mission, we run a query for a feature service named like "Tracks_" in the mission's folder
-                // If no missions found, skip this and return an empty list
-                else foreach (PortalItem mission in missions) {
-                    string queryString;
-                    //string metadata = mission.GetXml(); // Doesn't give us the mission name we need
-                    string folderId = mission.FolderID;
-                    if (String.IsNullOrWhiteSpace(folderId)) continue;
+                return missions;
 
-                    // Construct PortalFolder to get folder name for display as name of mission
-                    Item portalFolder = ItemFactory.Instance.Create(folderId, ItemFactory.ItemType.PortalFolderItem);
-                    // The Mission and its folder could be owned by someone else but shared. In that case, we can get to the Mission
-                    // and its tracks, but won't be able to read the folder name. And since there's no Mission item in the SDK yet, we
-                    // can't read its custom properties, so we won't have a friendly name for it.
-                    //string missionName = portalFolder != null ? portalFolder.Name : "<Mission name unavailable>";
-                    // Alternate: get Mission Map; its Description contains the Mission name
-                    const String MAP_DESC_PREAMBLE = "A map for mission "; // What to look for in the Mission Map Description
-                    queryString = $"ownerfolder:{folderId} AND type:\"Map\" AND title:\"MissionMap_{folderId}\"";
-                    PortalQueryResultSet<PortalItem> missionMaps = await portal.SearchForContentAsync(new PortalQueryParameters(queryString));
-                    PortalItem missionMap = missionMaps.Results.FirstOrDefault();
-                    String missionMapDesc = !String.IsNullOrEmpty(missionMap.Description) ? missionMap.Description : "<Mission name unavailable>";
-                    int mapDescPreambleEndLoc = missionMapDesc.IndexOf(MAP_DESC_PREAMBLE) + MAP_DESC_PREAMBLE.Length;
-                    String missionName = missionMapDesc.Substring(mapDescPreambleEndLoc, missionMapDesc.Length - mapDescPreambleEndLoc);
-
-                    // Grab the tracks feature service
-                    queryString = $"ownerfolder:{folderId} AND title:Tracks_ AND type:Feature";
-                    PortalQueryResultSet<PortalItem> trackFCs = await portal.SearchForContentAsync(new PortalQueryParameters(queryString));
-                    IEnumerable<MissionTracksItem> items = trackFCs.Results.Select<PortalItem, MissionTracksItem>(pi => {
-                        return new MissionTracksItem(pi, missionName, pi.Title);
-                    });
-                    listItems = listItems.Concat(items);
-                    System.Diagnostics.Debug.WriteLine($"{listItems.Count()} items for {missionName}");
-                }
-                System.Diagnostics.Debug.WriteLine($"{listItems.Count()} items found");
-                return listItems;
-
-                async Task<List<MissionTracksItem>> GetDemoMissions(ArcGISPortal demoPortal) {
+/*                NOTE: The following is no longer needed, now that we use the Groups to get to the Mission info.
+ *                Hardcoded demo item info for scenario where using folder ID to get info
+ *                async Task<List<MissionTracksItem>> GetDemoMissions(ArcGISPortal demoPortal) {
                     List<MissionTracksItem> demoMissions = new List<MissionTracksItem>();
                     PortalQueryResultSet<PortalItem> demoFSvcs;
                     
@@ -436,7 +428,8 @@ namespace MissionAgentReview {
                     demoMissions.Add(new MissionTracksItem(demoFSvcs.Results.FirstOrDefault(), "Perimeter Patrol", "Perimeter Patrol Tracks"));
 
                     return demoMissions;
-                }
+                }*/
+
             }, ps.Progressor);
 
             // If there was a problem enumerating Missions, don't show a chooser dialog
@@ -450,12 +443,14 @@ namespace MissionAgentReview {
             bool? result = dlg.ShowDialog();
             if (result ?? false) {
                 // Do something with chosen item
-                MissionTracksItem item = dlg.SelectedItem;
-                await QueuedTask.Run(() => LayerFactory.Instance.CreateFeatureLayer(item.PortalItem, MapView.Active.Map, layerName:item.MissionName));
+                MissionItemDetails item = dlg.SelectedItem;
+                await QueuedTask.Run(() => LayerFactory.Instance.CreateFeatureLayer(item.TracksItem, MapView.Active.Map, layerName:item.MissionName));
             }
             //else canceled
 
         }
+
+
 
         #region LOS Toolset
 

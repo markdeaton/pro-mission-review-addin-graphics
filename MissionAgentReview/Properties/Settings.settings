@@ -5,5 +5,8 @@
     <Setting Name="DemoPortalUri" Type="System.String" Scope="Application">
       <Value Profile="(Default)">https://publicsafety.bd.esri.com/portal/</Value>
     </Setting>
+    <Setting Name="MapDescPreamble" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">A map for mission </Value>
+    </Setting>
   </Settings>
 </SettingsFile>
