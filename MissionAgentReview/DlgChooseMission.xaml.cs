@@ -10,7 +10,6 @@ namespace MissionAgentReview {
     /// Interaction logic for DlgChooseMission.xaml
     /// </summary>
     public partial class DlgChooseMission : ArcGIS.Desktop.Framework.Controls.ProWindow {
-        private bool _isListItemSelected = false;
         private MissionItemDetails _selectedItem;
         private IList<MissionItemDetails> _missionItems;
 

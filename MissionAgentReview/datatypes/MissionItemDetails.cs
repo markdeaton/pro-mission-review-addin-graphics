@@ -1,4 +1,5 @@
 ﻿using ArcGIS.Desktop.Core.Portal;
+using System.Collections.Generic;
 
 namespace MissionAgentReview.datatypes {
     public class MissionItemDetails {
@@ -18,6 +19,14 @@ namespace MissionAgentReview.datatypes {
                     this.MissionItem.ItemID == mids.MissionItem.ItemID &&
                     TracksItem.ItemID == mids.TracksItem.ItemID);
             } else return MissionName.Equals(obj);
+        }
+
+        public override int GetHashCode() {
+            int hashCode = -17125422;
+            hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(MissionName);
+            hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(MissionItem.ItemID);
+            hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(TracksItem.ItemID);
+            return hashCode;
         }
     }
 }

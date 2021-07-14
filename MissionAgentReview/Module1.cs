@@ -22,7 +22,6 @@ using ArcGIS.Desktop.Core.Portal;
 using ArcGIS.Desktop.Core;
 using MissionAgentReview.datatypes;
 using ArcGIS.Desktop.Framework.Dialogs;
-using Newtonsoft.Json.Linq;
 
 namespace MissionAgentReview {
     internal class Module1 : Module {
@@ -102,10 +101,10 @@ namespace MissionAgentReview {
                 foreach (Layer lyr in lyrs) {
                     // Only agent track result graphics layers selected?
                     // Unfortunately, we can only search by graphic layer type and layer name
-                    if (isAgentTracksGraphicsLayer(lyr)) {
+                    if (IsAgentTracksGraphicsLayer(lyr)) {
                         _dctGLViewshed.Add(lyr as GraphicsLayer, null);
                     }
-                    areOnlyAgentTrackGraphicsLyrsSelected &= isAgentTracksGraphicsLayer(lyr);
+                    areOnlyAgentTrackGraphicsLyrsSelected &= IsAgentTracksGraphicsLayer(lyr);
 
                     // Look for one that has all the characteristics of a Mission agent tracks layer
                     FeatureLayer lyrFound = await extractAgentTracksFeatureLayer(lyr);
@@ -463,7 +462,7 @@ namespace MissionAgentReview {
         //private static TimeSequencingViewshed _viewshed = null;
         private static Dictionary<GraphicsLayer, TimeSequencingViewshed> _dctGLViewshed = new Dictionary<GraphicsLayer, TimeSequencingViewshed>();
 
-        private bool isAgentTracksGraphicsLayer(Layer lyr) {
+        private bool IsAgentTracksGraphicsLayer(Layer lyr) {
             return (lyr is GraphicsLayer && lyr.Name.StartsWith(AGENTTRACKLYRNAME_PREAMBLE));
         }
 
