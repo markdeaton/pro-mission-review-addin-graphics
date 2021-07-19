@@ -1,15 +1,32 @@
-﻿using ArcGIS.Core.CIM;
+﻿//   Copyright 2020 Esri
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+
+//       http://www.apache.org/licenses/LICENSE-2.0
+
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+using ArcGIS.Core.CIM;
 using ArcGIS.Core.Data;
 using ArcGIS.Core.Events;
 using ArcGIS.Core.Geometry;
+using ArcGIS.Desktop.Core;
+using ArcGIS.Desktop.Core.Portal;
 using ArcGIS.Desktop.Editing;
 using ArcGIS.Desktop.Framework;
 using ArcGIS.Desktop.Framework.Contracts;
+using ArcGIS.Desktop.Framework.Dialogs;
 using ArcGIS.Desktop.Framework.Threading.Tasks;
 using ArcGIS.Desktop.Layouts;
 using ArcGIS.Desktop.Mapping;
 using ArcGIS.Desktop.Mapping.Events;
+using MissionAgentReview.datatypes;
 using MissionAgentReview.Exceptions;
+using MissionAgentReview.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -17,11 +34,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Field = ArcGIS.Core.Data.Field;
 using QueryFilter = ArcGIS.Core.Data.QueryFilter;
-using MissionAgentReview.Extensions;
-using ArcGIS.Desktop.Core.Portal;
-using ArcGIS.Desktop.Core;
-using MissionAgentReview.datatypes;
-using ArcGIS.Desktop.Framework.Dialogs;
 
 namespace MissionAgentReview {
     internal class Module1 : Module {
@@ -271,12 +283,12 @@ namespace MissionAgentReview {
                                 elt.SetCustomProperty(ATTR_HEADING_AT_START, graphic.Attributes[ATTR_HEADING_AT_START].ToString());
                             if (graphic.Attributes.ContainsKey(ATTR_HEADING_AT_END))
                                 elt.SetCustomProperty(ATTR_HEADING_AT_END, graphic.Attributes[ATTR_HEADING_AT_END].ToString());
-                         }
-                        
+                        }
+
                         // Attributes improperly nulled in graphic elements added to graphics layer. * Fixed in 2.7 as long as attributes don't include Shape *
                         // Need to use GraphicElement CustomProperties as a workaround.
                         graphicsLayer?.AddElement(startGraphic); Element lastElt = graphicsLayer?.AddElement(endGraphic);
-                        
+
                         graphicsLayer?.SetVisibility(true);
                         // NOTE: Crash upon exiting Pro if the following line is run with a null or empty parameter:
                         //graphicsLayer?.UnSelectElements(new List<Element>() { lastElt });
@@ -314,7 +326,7 @@ namespace MissionAgentReview {
                         //SymbolFactory.Instance.ConstructStroke(color, 2),
                         new CIMSolidStroke() {
                             Color = color,
-                            Width = 3, 
+                            Width = 3,
                             CapStyle = LineCapStyle.Square,
                             JoinStyle = LineJoinStyle.Miter,
                             MiterLimit = 5,
@@ -377,8 +389,6 @@ namespace MissionAgentReview {
                 /// Find important information about a Mission.
                 /// This isn't straightforward, because the name given a Mission during setup isn't the same as the title the Mission item gets.
                 /// Here we search the user's groups to find which ones contain Mission items; then look for associated items and info within that group.
-                /// Potential flaw: if someone went and put the user and a Mission into a second group without also adding associated feature services
-                /// (tracks) to the new group, this may fail to find the proper information.
 
                 // Get user's groups
                 IReadOnlyList<PortalGroup> groups = await portal.GetGroupsFromUserAsync(portal.GetSignOnUsername());
@@ -388,7 +398,7 @@ namespace MissionAgentReview {
                     Func<Item, bool> qryMission = itm => itm.Type == "Mission";
                     Func<Item, bool> qryWebMap = itm => itm.Type == "Web Map";
                     Func<Item, bool> qryTracks = itm => itm.Type == "Feature Service" && itm.Title.StartsWith("Tracks_");
-                    if ( items.Any<Item>(qryMission) && items.Any<Item>(qryWebMap) && items.Any<Item>(qryTracks) ) {
+                    if (items.Any(qryMission) && items.Any(qryWebMap) && items.Any(qryTracks)) {
 
                         // Find the Mission, Mission Map, and Tracks feature service in this group
                         PortalItem mission = items.Where(qryMission).FirstOrDefault() as PortalItem;
@@ -416,20 +426,20 @@ namespace MissionAgentReview {
 
                 return missions;
 
-/*                NOTE: The following is no longer needed, now that we use the Groups to get to the Mission info.
- *                Hardcoded demo item info for scenario where using folder ID to get info
- *                async Task<List<MissionTracksItem>> GetDemoMissions(ArcGISPortal demoPortal) {
-                    List<MissionTracksItem> demoMissions = new List<MissionTracksItem>();
-                    PortalQueryResultSet<PortalItem> demoFSvcs;
-                    
-                    demoFSvcs = await demoPortal.SearchForContentAsync(PortalQueryParameters.CreateForItemsWithId("c7c5a1774b22415aa12aa6399ca9d6e4"));
-                    demoMissions.Add(new MissionTracksItem(demoFSvcs.Results.FirstOrDefault(), "Incident Patrol", "Incident Patrol Tracks"));
+                /*                NOTE: The following is no longer needed, now that we use the Groups to get to the Mission info.
+                 *                Hardcoded demo item info for scenario where using folder ID to get info
+                 *                async Task<List<MissionTracksItem>> GetDemoMissions(ArcGISPortal demoPortal) {
+                                    List<MissionTracksItem> demoMissions = new List<MissionTracksItem>();
+                                    PortalQueryResultSet<PortalItem> demoFSvcs;
 
-                    demoFSvcs = await demoPortal.SearchForContentAsync(PortalQueryParameters.CreateForItemsWithId("e2b9a6e184964e9ab1aa73b393230f49"));
-                    demoMissions.Add(new MissionTracksItem(demoFSvcs.Results.FirstOrDefault(), "Perimeter Patrol", "Perimeter Patrol Tracks"));
+                                    demoFSvcs = await demoPortal.SearchForContentAsync(PortalQueryParameters.CreateForItemsWithId("c7c5a1774b22415aa12aa6399ca9d6e4"));
+                                    demoMissions.Add(new MissionTracksItem(demoFSvcs.Results.FirstOrDefault(), "Incident Patrol", "Incident Patrol Tracks"));
 
-                    return demoMissions;
-                }*/
+                                    demoFSvcs = await demoPortal.SearchForContentAsync(PortalQueryParameters.CreateForItemsWithId("e2b9a6e184964e9ab1aa73b393230f49"));
+                                    demoMissions.Add(new MissionTracksItem(demoFSvcs.Results.FirstOrDefault(), "Perimeter Patrol", "Perimeter Patrol Tracks"));
+
+                                    return demoMissions;
+                                }*/
 
             }, ps.Progressor);
 
@@ -445,7 +455,7 @@ namespace MissionAgentReview {
             if (result ?? false) {
                 // Do something with chosen item
                 MissionItemDetails item = dlg.SelectedItem;
-                await QueuedTask.Run(() => LayerFactory.Instance.CreateFeatureLayer(item.TracksItem, MapView.Active.Map, layerName:item.MissionName));
+                await QueuedTask.Run(() => LayerFactory.Instance.CreateFeatureLayer(item.TracksItem, MapView.Active.Map, layerName: item.MissionName));
             }
             //else canceled
 

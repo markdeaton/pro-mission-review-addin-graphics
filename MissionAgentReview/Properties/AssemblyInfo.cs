@@ -8,9 +8,9 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("MissionAgentReview")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Acme")]
+[assembly: AssemblyCompany("Esri")]
 [assembly: AssemblyProduct("MissionAgentReview")]
-[assembly: AssemblyCopyright("Copyright © Acme 2020")]
+[assembly: AssemblyCopyright("Copyright © Esri GeoXC 2020")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -32,5 +32,5 @@ using System.Runtime.InteropServices;
 // You can specify all the values or you can default the Build and Revision Numbers 
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("0.76.0.0")]
+[assembly: AssemblyVersion("0.85.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
