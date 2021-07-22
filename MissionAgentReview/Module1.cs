@@ -100,45 +100,53 @@ namespace MissionAgentReview {
             // TODO Determine which agent tracks aren't deselected and remove their viewsheds (if needed)
             // TODO Determine which agent tracks are selected and add viewsheds (if needed)
             QueuedTask.Run(async () => {
-                MapView mv = obj.MapView;
                 bool isAgentTrackFeatLyrSelected = false;
-                bool areOnlyAgentTrackGraphicsLyrsSelected = mv.GetSelectedLayers().Count > 0;
+                bool areOnlyAgentTrackGraphicsLyrsSelected = false;
 
                 _agentTracksFeatureLayer = null;
 
-                ClearExistingViewsheds();
+                try {
+                    ClearExistingViewsheds();
 
-                IReadOnlyList<Layer> lyrs = mv.GetSelectedLayers();
-                // 1. Look for add-on feature enablement conditions in the selected layer list
-                foreach (Layer lyr in lyrs) {
-                    // Only agent track result graphics layers selected?
-                    // Unfortunately, we can only search by graphic layer type and layer name
-                    if (IsAgentTracksGraphicsLayer(lyr)) {
-                        _dctGLViewshed.Add(lyr as GraphicsLayer, null);
+                    if (obj != null && obj.MapView != null && obj.MapView.GetSelectedLayers() != null) {
+
+                        areOnlyAgentTrackGraphicsLyrsSelected = obj.MapView.GetSelectedLayers().Count > 0;
+                        IReadOnlyList<Layer> lyrs = obj.MapView.GetSelectedLayers();
+
+                        // 1. Look for add-on feature enablement conditions in the selected layer list
+                        foreach (Layer lyr in lyrs) {
+                            // Only agent track result graphics layers selected?
+                            // Unfortunately, we can only search by graphic layer type and layer name
+                            if (IsAgentTracksGraphicsLayer(lyr)) {
+                                _dctGLViewshed.Add(lyr as GraphicsLayer, null);
+                            }
+                            areOnlyAgentTrackGraphicsLyrsSelected &= IsAgentTracksGraphicsLayer(lyr);
+
+                            // Look for one that has all the characteristics of a Mission agent tracks layer
+                            FeatureLayer lyrFound = await extractAgentTracksFeatureLayer(lyr);
+                            if (_agentTracksFeatureLayer == null && lyrFound != null) {
+                                _agentTracksFeatureLayer = lyrFound;
+                                isAgentTrackFeatLyrSelected = true;
+                                //break;
+                            }
+                        }
                     }
-                    areOnlyAgentTrackGraphicsLyrsSelected &= IsAgentTracksGraphicsLayer(lyr);
+                } finally {
 
-                    // Look for one that has all the characteristics of a Mission agent tracks layer
-                    FeatureLayer lyrFound = await extractAgentTracksFeatureLayer(lyr);
-                    if (_agentTracksFeatureLayer == null && lyrFound != null) {
-                        _agentTracksFeatureLayer = lyrFound;
-                        isAgentTrackFeatLyrSelected = true;
-                        //break;
+                    // 2. Enable conditions/take other actions based on what we found about the selected layers list
+                    if (areOnlyAgentTrackGraphicsLyrsSelected) {
+                        FrameworkApplication.State.Activate("onlyAgentTrackGraphicsLyrsAreSelected_state");
+                    } else {
+                        FrameworkApplication.State.Deactivate("onlyAgentTrackGraphicsLyrsAreSelected_state");
                     }
-                }
-                // 2. Enable conditions/take other actions based on what we found about the selected layers list
-                if (areOnlyAgentTrackGraphicsLyrsSelected) {
-                    FrameworkApplication.State.Activate("onlyAgentTrackGraphicsLyrsAreSelected_state");
-                } else {
-                    FrameworkApplication.State.Deactivate("onlyAgentTrackGraphicsLyrsAreSelected_state");
-                }
 
-                if (isAgentTrackFeatLyrSelected) {
-                    FrameworkApplication.State.Activate("trackFeatureLayerSelected_state");
-                    populateAgentList();
-                } else {
-                    FrameworkApplication.State.Deactivate("trackFeatureLayerSelected_state");
-                    _agentList.Clear();
+                    if (isAgentTrackFeatLyrSelected) {
+                        FrameworkApplication.State.Activate("trackFeatureLayerSelected_state");
+                        populateAgentList();
+                    } else {
+                        FrameworkApplication.State.Deactivate("trackFeatureLayerSelected_state");
+                        _agentList.Clear();
+                    }
                 }
             });
 
