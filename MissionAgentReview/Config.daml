@@ -81,7 +81,7 @@
       </tabGroups>
       <tabs>
         <!--condition="MissionReviewTabEnabled_Condition"-->
-        <tab id="MissionAgentReview_Tab" caption="Post-Mission Review" keytip="A" tabGroupID="MissionReview_TabGroup">
+        <tab id="MissionAgentReview_Tab" caption="Post-Mission Review" keytip="A" tabGroupID="MissionReview_TabGroup" condition="esri_mapping_mapPane">
           <group refID="MissionReview_GenerateTracks_Group" />
           <group refID="MissionReview_LOS_Group" />
         </tab>
@@ -103,8 +103,7 @@
       <controls>
         <!-- add your controls here -->
         <!-- Button to browser for an Agent Tracks dataset -->
-        <button id="AgentTracksBrowse_Button" className="MissionAgentReview_Module:OnAgentTracksBrowseButtonClick" caption="Open Agent Tracks" loadOnClick="true" largeImage="Images\GenericButtonGreen32.png" smallImage="Images\GenericButtonGreen16.png"
-                condition="BrowseMissionsButtonEnabled_Condition">
+        <button id="AgentTracksBrowse_Button" className="MissionAgentReview_Module:OnAgentTracksBrowseButtonClick" caption="Open Agent Tracks" loadOnClick="true" largeImage="Images\GenericButtonGreen32.png" smallImage="Images\GenericButtonGreen16.png">
           <tooltip heading="Tracks Dataset">Select an agent tracks dataset to add to the map<disabledText>This command must be used in a Map or Scene view</disabledText>
         </tooltip>
         </button>
