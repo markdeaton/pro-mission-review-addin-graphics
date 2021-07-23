@@ -31,6 +31,9 @@
         <state id="onlyAgentTrackGraphicsLyrsAreSelected_state" />
       </or>
     </insertCondition>
+    <insertCondition id="BrowseMissionsButtonEnabled_Condition"  caption="Missions Dialog Button Enabled?">
+      <state id="esri_mapping_mapPane" />
+    </insertCondition>
     <insertCondition id="AgentTrackGeneratorListEnabled_Condition" caption="Agent Track Generator Enabled?">
       <state id="trackFeatureLayerSelected_state" />
     </insertCondition>
@@ -100,8 +103,10 @@
       <controls>
         <!-- add your controls here -->
         <!-- Button to browser for an Agent Tracks dataset -->
-        <button id="AgentTracksBrowse_Button" className="MissionAgentReview_Module:OnAgentTracksBrowseButtonClick" caption="Open Agent Tracks" loadOnClick="true" largeImage="Images\GenericButtonGreen32.png" smallImage="Images\GenericButtonGreen16.png">
-          <tooltip heading="Tracks Dataset">Select an agent tracks dataset to add to the map</tooltip>
+        <button id="AgentTracksBrowse_Button" className="MissionAgentReview_Module:OnAgentTracksBrowseButtonClick" caption="Open Agent Tracks" loadOnClick="true" largeImage="Images\GenericButtonGreen32.png" smallImage="Images\GenericButtonGreen16.png"
+                condition="BrowseMissionsButtonEnabled_Condition">
+          <tooltip heading="Tracks Dataset">Select an agent tracks dataset to add to the map<disabledText>This command must be used in a Map or Scene view</disabledText>
+        </tooltip>
         </button>
         <!-- Combo Box that holds the list of agents -->
         <comboBox id="MissionAgentReviewAgents_Combo" caption="Agents:" className="AgentsCombo" condition="AgentTrackGeneratorListEnabled_Condition" itemWidth="140" extendedCaption="Choose from this list of agents to examine an agent's path during the mission." 

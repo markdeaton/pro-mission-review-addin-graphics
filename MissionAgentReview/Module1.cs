@@ -226,6 +226,7 @@ namespace MissionAgentReview {
                     WhereClause = $"{FIELD_AGENTNAME} = '{agentName}'"
                 };
 
+                // Daml conditions should guard against this code running outside a map or scene view
                 Map map = MapView.Active.Map;
                 if (map.MapType == MapType.Map || map.MapType == MapType.Scene) {
 
