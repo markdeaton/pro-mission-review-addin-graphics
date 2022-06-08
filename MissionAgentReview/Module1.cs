@@ -39,12 +39,11 @@ namespace MissionAgentReview {
     internal class Module1 : Module {
         private static Module1 _this = null;
         private SubscriptionToken _tocToken;
-        private QueryFilter _agentListQueryFilter = new QueryFilter() {
-            PrefixClause = "DISTINCT",
-            SubFields = FIELD_AGENTNAME
-        };
         private const string FIELD_AGENTNAME = "created_user";
-        private const string FIELD_CREATEDATETIME = "created_date";
+        /// <summary>A custom field only for demos to overcome the issue with Editor Tracking when loading legacy data into an empty mission</summary>
+        private const string FIELD_AUX_AGENTNAME_DEMO_USE_ONLY = "created_user_demo_only";
+        private static string _field_agentName;
+        //private const string FIELD_CREATEDATETIME = "created_date";
         private const string FIELD_TIMESTAMP = "location_timestamp";
         private const string AGENTTRACKLYRNAME_PREAMBLE = "Agent Path: ";
         private static FeatureLayer _agentTracksFeatureLayer;
@@ -100,13 +99,13 @@ namespace MissionAgentReview {
             // TODO Determine which agent tracks aren't deselected and remove their viewsheds (if needed)
             // TODO Determine which agent tracks are selected and add viewsheds (if needed)
             QueuedTask.Run(async () => {
-                bool isAgentTrackFeatLyrSelected = false;
-                bool areOnlyAgentTrackGraphicsLyrsSelected = false;
+            bool isAgentTrackFeatLyrSelected = false;
+            bool areOnlyAgentTrackGraphicsLyrsSelected = false;
 
-                _agentTracksFeatureLayer = null;
+            _agentTracksFeatureLayer = null;
 
-                try {
-                    ClearExistingViewsheds();
+            try {
+                ClearExistingViewsheds();
 
                     if (obj != null && obj.MapView != null && obj.MapView.GetSelectedLayers() != null) {
 
@@ -166,11 +165,23 @@ namespace MissionAgentReview {
                             isJoinedTable = fc.IsJoinedTable();
                             hasDataRows = fc.GetCount() > 0;
                             if (!isJoinedTable && hasDataRows) {
-                                TableDefinition tblDef = fc.GetDefinition();
-                                IReadOnlyList<Field> fields = tblDef.GetFields();
-                                hasUserField = fields.Any((fld => fld.Name == FIELD_AGENTNAME && fld.FieldType == FieldType.String));
-                                hasCreateDateField = fields.Any((fld => fld.Name == FIELD_CREATEDATETIME && fld.FieldType == FieldType.Date));
-                                if (hasUserField && hasCreateDateField) lyrFound = featLyr;
+/*                                TableDefinition tblDef = fc.GetDefinition();
+                                IReadOnlyList<Field> fields = tblDef.GetFields();*/
+
+                                // Check to see which is the track creator field: user_created or user_created_demo_only
+                                List<FieldDescription> fields = featLyr.GetFieldDescriptions();
+                                bool hasDemoAgentField = fields.Any((fieldDesc) => {
+                                    return fieldDesc.Name == FIELD_AUX_AGENTNAME_DEMO_USE_ONLY && fieldDesc.Type == FieldType.String;
+                                });
+                                string agentNameField = hasDemoAgentField ? FIELD_AUX_AGENTNAME_DEMO_USE_ONLY : FIELD_AGENTNAME;
+
+                                hasUserField = fields.Any((fld => fld.Name == agentNameField && fld.Type == FieldType.String));
+                                hasCreateDateField = fields.Any((fld => fld.Name == FIELD_TIMESTAMP && fld.Type == FieldType.Date));
+
+                                if (hasUserField && hasCreateDateField) {
+                                    lyrFound = featLyr;
+                                    _field_agentName = agentNameField;
+                                }
                             }
                         } catch (Exception e) {
                             System.Diagnostics.Debug.Write($"Error while examining feature layer '{featLyr.Name}': {e.Message}");
@@ -197,12 +208,16 @@ namespace MissionAgentReview {
                 if (_agentTracksFeatureLayer == null) return;
                 _agentList.Clear();
                 QueuedTask.Run(() => {
+                    QueryFilter _agentListQueryFilter = new QueryFilter() {
+                        PrefixClause = "DISTINCT",
+                        SubFields = _field_agentName
+                    };
 
                     // Query the feature *layer* to take into account any query definitions on the layer
                     using (RowCursor rowCur = _agentTracksFeatureLayer.Search(_agentListQueryFilter)) {
                         while (rowCur.MoveNext()) {
                             using (Row row = rowCur.Current) {
-                                _agentList.Add(row[FIELD_AGENTNAME].ToString()); // Assumes only one field in the query filter
+                                _agentList.Add(row[_field_agentName].ToString()); // Assumes only one field in the query filter
                             }
                         }
                     }
@@ -222,8 +237,8 @@ namespace MissionAgentReview {
 
                 // Get tracks for agent, sorted by datetime
                 QueryFilter agentTracksQF = new QueryFilter() {
-                    PostfixClause = $"ORDER BY {FIELD_CREATEDATETIME}",
-                    WhereClause = $"{FIELD_AGENTNAME} = '{agentName}'"
+                    PostfixClause = $"ORDER BY {FIELD_TIMESTAMP}",
+                    WhereClause = $"{_field_agentName} = '{agentName}'"
                 };
 
                 // Daml conditions should guard against this code running outside a map or scene view
