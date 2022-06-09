@@ -1,0 +1,10 @@
+Migration Status Report
+  Migrate ArcGIS Pro extension: from 2.x to 3.0, Version  requires ArcGIS Pro 3.0.33747 the installed version is 3.0.36030
+  Convert Solution: C:\Projects\2020_MissionAgentProAddIn\MissionAgentReview\MissionAgentReview.sln
+  MissionAgentReview.csproj
+   project folder: 
+   C:\Projects\2020_MissionAgentProAddIn\MissionAgentReview\MissionAgentReview\
+   C:\Projects\2020_MissionAgentProAddIn\MissionAgentReview\MissionAgentReview\
+   language: CS
+   project type: AddIn
+   project has WPF: PresentationFramework

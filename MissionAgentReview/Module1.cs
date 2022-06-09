@@ -14,6 +14,7 @@ using ArcGIS.Core.CIM;
 using ArcGIS.Core.Data;
 using ArcGIS.Core.Events;
 using ArcGIS.Core.Geometry;
+using ArcGIS.Core.Internal.Geometry;
 using ArcGIS.Desktop.Core;
 using ArcGIS.Desktop.Core.Portal;
 using ArcGIS.Desktop.Editing;
@@ -236,7 +237,7 @@ namespace MissionAgentReview {
                 CIMSymbolReference symbolRef = ArrowSym().MakeSymbolReference();
 
                 // Get tracks for agent, sorted by datetime
-                QueryFilter agentTracksQF = new QueryFilter() {
+                QueryFilter agentTracksQF = new() {
                     PostfixClause = $"ORDER BY {FIELD_TIMESTAMP}",
                     WhereClause = $"{_field_agentName} = '{agentName}'"
                 };
@@ -479,7 +480,13 @@ namespace MissionAgentReview {
             if (result ?? false) {
                 // Do something with chosen item
                 MissionItemDetails item = dlg.SelectedItem;
-                await QueuedTask.Run(() => LayerFactory.Instance.CreateFeatureLayer(item.TracksItem, MapView.Active.Map, layerName: item.MissionName));
+                await QueuedTask.Run(() => {
+                    //LayerFactory.Instance.CreateFeatureLayer(item.TracksItem, MapView.Active.Map, layerName: item.MissionName);
+                    var layerParams = new FeatureLayerCreationParams(item.TracksItem) {
+                        Name = item.MissionName
+                    };
+                    LayerFactory.Instance.CreateLayer<FeatureLayer>(layerParams, MapView.Active.Map);
+                });
             }
             //else canceled
 
@@ -511,7 +518,9 @@ namespace MissionAgentReview {
                     TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(e.Viewpoints, e.CurrentViewpointIndex, VERT_ANGLE,
                         HORIZ_ANGLE, MIN_DIST, MAX_DIST);
                     MapView mapView = MapView.Active;
-                    mapView?.RemoveExploratoryAnalysis(tsv); tsv.Dispose();
+                    //mapView?.RemoveExploratoryAnalysis(tsv); tsv.Dispose();
+                    mapView?.RemoveExploratoryAnalysisAsync(tsv).Wait(); 
+                    tsv.Dispose();
                     tsv = newViewshed;
                     mapView?.AddExploratoryAnalysis(tsv);
                 }
@@ -529,7 +538,9 @@ namespace MissionAgentReview {
                     TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(e.Viewpoints, e.CurrentViewpointIndex, VERT_ANGLE,
                         HORIZ_ANGLE, MIN_DIST, MAX_DIST);
                     MapView mapView = MapView.Active;
-                    mapView?.RemoveExploratoryAnalysis(tsv); tsv.Dispose();
+                    //mapView?.RemoveExploratoryAnalysis(tsv); tsv.Dispose();
+                    mapView?.RemoveExploratoryAnalysisAsync(tsv).Wait(); 
+                    tsv.Dispose();
                     tsv = newViewshed;
                     mapView?.AddExploratoryAnalysis(tsv);
                 }
@@ -560,7 +571,8 @@ namespace MissionAgentReview {
                         TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(tsvInvalid.Viewpoints, tsvInvalid.ViewpointIndex, VERT_ANGLE,
                             HORIZ_ANGLE, MIN_DIST, MAX_DIST);
                         MapView mapView = MapView.Active;
-                        mapView?.RemoveExploratoryAnalysis(tsvInvalid);
+                        //mapView?.RemoveExploratoryAnalysis(tsvInvalid);
+                        mapView?.RemoveExploratoryAnalysisAsync(tsvInvalid).Wait(); 
                         tsvInvalid.Dispose();
                         mapView?.AddExploratoryAnalysis(newViewshed);
                         _dctGLViewshed[glyr] = newViewshed;
@@ -579,7 +591,8 @@ namespace MissionAgentReview {
         private static void ClearExistingViewsheds() {
             foreach (TimeSequencingViewshed tsv in _dctGLViewshed.Values) {
                 if (tsv != null) {
-                    MapView.Active.RemoveExploratoryAnalysis(tsv);
+                    //MapView.Active.RemoveExploratoryAnalysis(tsv);
+                    MapView.Active.RemoveExploratoryAnalysisAsync(tsv).Wait();
                     tsv.Dispose();
                 }
             }
