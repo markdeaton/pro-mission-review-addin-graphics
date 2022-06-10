@@ -1,4 +1,4 @@
-﻿//   Copyright 2020 Esri
+﻿//   Copyright 2022 Esri
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
 //   You may obtain a copy of the License at
@@ -166,9 +166,10 @@ namespace MissionAgentReview {
                             isJoinedTable = fc.IsJoinedTable();
                             hasDataRows = fc.GetCount() > 0;
                             if (!isJoinedTable && hasDataRows) {
-/*                                TableDefinition tblDef = fc.GetDefinition();
-                                IReadOnlyList<Field> fields = tblDef.GetFields();*/
-
+                                // Note: due to Editor Tracking, we couldn't set up an empty demo mission and populated it from
+                                // archived tracks, as we wanted to. To worka round the problem *ONLY FOR DEMO PURPOSES*, we
+                                // created and extra field in the tracks layer called created_user_demo_only. 
+                                // Here we look to see whether that demo-only field exists, and use it as the user name if it does.
                                 // Check to see which is the track creator field: user_created or user_created_demo_only
                                 List<FieldDescription> fields = featLyr.GetFieldDescriptions();
                                 bool hasDemoAgentField = fields.Any((fieldDesc) => {
