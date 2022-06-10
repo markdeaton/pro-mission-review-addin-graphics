@@ -404,7 +404,6 @@ namespace MissionAgentReview {
                 ArcGISPortal portal = ArcGISPortalManager.Current.GetActivePortal();
                 ps.Message = $"Connecting to {portal.PortalUri}";
                 if (!portal.IsSignedOn()) {
-                    //if (!portal.SignIn().success) {
                     MessageBox.Show("You must be signed into a portal for this. Please do so before trying to open a Mission.");
                     return missions;
                 }
@@ -452,21 +451,6 @@ namespace MissionAgentReview {
 
                 return missions;
 
-                /*                NOTE: The following is no longer needed, now that we use the Groups to get to the Mission info.
-                 *                Hardcoded demo item info for scenario where using folder ID to get info
-                 *                async Task<List<MissionTracksItem>> GetDemoMissions(ArcGISPortal demoPortal) {
-                                    List<MissionTracksItem> demoMissions = new List<MissionTracksItem>();
-                                    PortalQueryResultSet<PortalItem> demoFSvcs;
-
-                                    demoFSvcs = await demoPortal.SearchForContentAsync(PortalQueryParameters.CreateForItemsWithId("c7c5a1774b22415aa12aa6399ca9d6e4"));
-                                    demoMissions.Add(new MissionTracksItem(demoFSvcs.Results.FirstOrDefault(), "Incident Patrol", "Incident Patrol Tracks"));
-
-                                    demoFSvcs = await demoPortal.SearchForContentAsync(PortalQueryParameters.CreateForItemsWithId("e2b9a6e184964e9ab1aa73b393230f49"));
-                                    demoMissions.Add(new MissionTracksItem(demoFSvcs.Results.FirstOrDefault(), "Perimeter Patrol", "Perimeter Patrol Tracks"));
-
-                                    return demoMissions;
-                                }*/
-
             }, ps.Progressor);
 
             // If there was a problem enumerating Missions, don't show a chooser dialog
@@ -482,7 +466,6 @@ namespace MissionAgentReview {
                 // Do something with chosen item
                 MissionItemDetails item = dlg.SelectedItem;
                 await QueuedTask.Run(() => {
-                    //LayerFactory.Instance.CreateFeatureLayer(item.TracksItem, MapView.Active.Map, layerName: item.MissionName);
                     var layerParams = new FeatureLayerCreationParams(item.TracksItem) {
                         Name = item.MissionName
                     };
@@ -501,7 +484,6 @@ namespace MissionAgentReview {
         private const double VERT_ANGLE = 30;
         private const double MIN_DIST = 1;
         private const double MAX_DIST = 75;
-        //private static TimeSequencingViewshed _viewshed = null;
         private static Dictionary<GraphicsLayer, TimeSequencingViewshed> _dctGLViewshed = new Dictionary<GraphicsLayer, TimeSequencingViewshed>();
 
         private bool IsAgentTracksGraphicsLayer(Layer lyr) {
@@ -519,7 +501,6 @@ namespace MissionAgentReview {
                     TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(e.Viewpoints, e.CurrentViewpointIndex, VERT_ANGLE,
                         HORIZ_ANGLE, MIN_DIST, MAX_DIST);
                     MapView mapView = MapView.Active;
-                    //mapView?.RemoveExploratoryAnalysis(tsv); tsv.Dispose();
                     mapView?.RemoveExploratoryAnalysisAsync(tsv).Wait(); 
                     tsv.Dispose();
                     tsv = newViewshed;
@@ -539,7 +520,6 @@ namespace MissionAgentReview {
                     TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(e.Viewpoints, e.CurrentViewpointIndex, VERT_ANGLE,
                         HORIZ_ANGLE, MIN_DIST, MAX_DIST);
                     MapView mapView = MapView.Active;
-                    //mapView?.RemoveExploratoryAnalysis(tsv); tsv.Dispose();
                     mapView?.RemoveExploratoryAnalysisAsync(tsv).Wait(); 
                     tsv.Dispose();
                     tsv = newViewshed;
@@ -558,7 +538,6 @@ namespace MissionAgentReview {
                 FrameworkApplication.State.Deactivate(CHECKED_STATE);
                 foreach (TimeSequencingViewshed tsv in _dctGLViewshed.Values.ToList()) {
                     tsv.Stop();
-                    //_viewshed?.Stop();
                 }
             } else { // Start viewshed
                 FrameworkApplication.State.Activate(CHECKED_STATE);
@@ -583,7 +562,6 @@ namespace MissionAgentReview {
                     _dctGLViewshed[glyr]?.Start();
                 }
             }
-            //}
         }
 
         /// <summary>
