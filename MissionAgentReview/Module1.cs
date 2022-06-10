@@ -565,8 +565,9 @@ namespace MissionAgentReview {
                     if (_dctGLViewshed[glyr] == null) {
                         TimeSequencingViewshed newViewshed = InitializeViewshedAndViewpoints(glyr);
                         _dctGLViewshed[glyr] = newViewshed;
-                    } else if (!_dctGLViewshed[glyr].IsValidAnalysisLayer) { // Has the viewshed been removed through other GUI means and is now invalid?
-                                                                             // We could just recreate everything from scratch, but here we save time by reusing previously calculated viewpoints
+                    } else if (!_dctGLViewshed[glyr].IsValidAnalysisLayer) {
+                        // Has the viewshed been removed through other GUI means and is now invalid?
+                        // We could just recreate everything from scratch, but here we save time by reusing previously calculated viewpoints
                         TimeSequencingViewshed tsvInvalid = _dctGLViewshed[glyr];
                         TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(tsvInvalid.Viewpoints, tsvInvalid.ViewpointIndex, VERT_ANGLE,
                             HORIZ_ANGLE, MIN_DIST, MAX_DIST);
