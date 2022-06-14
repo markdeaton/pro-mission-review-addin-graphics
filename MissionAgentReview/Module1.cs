@@ -501,7 +501,7 @@ namespace MissionAgentReview {
                     TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(e.Viewpoints, e.CurrentViewpointIndex, VERT_ANGLE,
                         HORIZ_ANGLE, MIN_DIST, MAX_DIST);
                     MapView mapView = MapView.Active;
-                    mapView?.RemoveExploratoryAnalysisAsync(tsv).Wait(); 
+                    mapView?.RemoveExploratoryAnalysisAsync(tsv); 
                     tsv.Dispose();
                     tsv = newViewshed;
                     mapView?.AddExploratoryAnalysis(tsv);
@@ -520,7 +520,7 @@ namespace MissionAgentReview {
                     TimeSequencingViewshed newViewshed = new TimeSequencingViewshed(e.Viewpoints, e.CurrentViewpointIndex, VERT_ANGLE,
                         HORIZ_ANGLE, MIN_DIST, MAX_DIST);
                     MapView mapView = MapView.Active;
-                    mapView?.RemoveExploratoryAnalysisAsync(tsv).Wait(); 
+                    mapView?.RemoveExploratoryAnalysisAsync(tsv);
                     tsv.Dispose();
                     tsv = newViewshed;
                     mapView?.AddExploratoryAnalysis(tsv);
@@ -553,7 +553,7 @@ namespace MissionAgentReview {
                             HORIZ_ANGLE, MIN_DIST, MAX_DIST);
                         MapView mapView = MapView.Active;
                         //mapView?.RemoveExploratoryAnalysis(tsvInvalid);
-                        mapView?.RemoveExploratoryAnalysisAsync(tsvInvalid).Wait(); 
+                        mapView?.RemoveExploratoryAnalysisAsync(tsvInvalid); 
                         tsvInvalid.Dispose();
                         mapView?.AddExploratoryAnalysis(newViewshed);
                         _dctGLViewshed[glyr] = newViewshed;
@@ -572,7 +572,7 @@ namespace MissionAgentReview {
             foreach (TimeSequencingViewshed tsv in _dctGLViewshed.Values) {
                 if (tsv != null) {
                     //MapView.Active.RemoveExploratoryAnalysis(tsv);
-                    MapView.Active.RemoveExploratoryAnalysisAsync(tsv).Wait();
+                    MapView.Active.RemoveExploratoryAnalysisAsync(tsv);
                     tsv.Dispose();
                 }
             }

@@ -33,7 +33,7 @@ namespace MissionAgentReview {
         public Camera Camera { get; }
     }
 
-    public class TimeSequencingViewshed : Viewshed, IDisposable {
+    public class TimeSequencingViewshed : Viewshed {
         public TimeSequencingViewshed(TimeSequencingViewshed tsv) : base(tsv) {
             _timer.Elapsed += OnIntervalElapsed;
         }
