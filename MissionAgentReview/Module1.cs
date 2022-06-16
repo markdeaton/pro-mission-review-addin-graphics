@@ -632,12 +632,14 @@ namespace MissionAgentReview {
                         if (gelt == graphics.First() && !String.IsNullOrEmpty(gelt.GetCustomProperty(ATTR_HEADING_AT_START))) {
                             MapPoint ptFirst = line.Points.First();
                             Camera cam1 = ConstructCamera(ptFirst, sr, Double.Parse(gelt.GetCustomProperty(ATTR_HEADING_AT_START)));
-                            viewpoints.Add(new TSVViewpoint((DateTime)gelt.GetGraphic().Attributes[FIELD_TIMESTAMP], cam1));
+                            DateTime dt = graphicElementDateTime(gelt);
+                            viewpoints.Add(new TSVViewpoint(dt, cam1));
                         }
                         // Add the endpoint as viewshed camera
                         MapPoint pt = line.Points.Last();
                         Camera cam = ConstructCamera(pt, sr, Double.Parse(gelt.GetCustomProperty(ATTR_HEADING_AT_END)));
-                        viewpoints.Add(new TSVViewpoint((DateTime)gelt.GetGraphic().Attributes[FIELD_TIMESTAMP], cam));
+                        DateTime datetime = graphicElementDateTime(gelt);
+                        viewpoints.Add(new TSVViewpoint(datetime, cam));
                     }
                     tsvBV.Viewpoints = viewpoints;
 
@@ -653,6 +655,15 @@ namespace MissionAgentReview {
 
                         Camera cam = new Camera(ptProj.X, ptProj.Y, ptProj.Z, -10, fixedHeading, srMap, CameraViewpoint.LookFrom);
                         return cam;
+                    }
+                    DateTime graphicElementDateTime(GraphicElement gelt) {
+                        var datetimeAttr = gelt.GetGraphic().Attributes[FIELD_TIMESTAMP];
+                        // Strangely, datetime fields are extracted as .NET DateTime type when the tracks graphics are first generated...
+                        // ...but are long (millisecond) epoch values when persisted in the Pro project document. Check for both conditions.
+                        DateTime datetime = datetimeAttr is long
+                            ? DateTimeOffset.FromUnixTimeMilliseconds((long)datetimeAttr).DateTime.ToLocalTime()
+                            : (DateTime)datetimeAttr;
+                        return datetime;
                     }
                 });
             }
