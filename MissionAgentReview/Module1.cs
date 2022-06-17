@@ -656,10 +656,12 @@ namespace MissionAgentReview {
                         Camera cam = new Camera(ptProj.X, ptProj.Y, ptProj.Z, -10, fixedHeading, srMap, CameraViewpoint.LookFrom);
                         return cam;
                     }
+                    /**
+                     * <summary>Strangely, datetime fields are extracted as .NET DateTime type when the tracks graphics are first generated...
+                     * ...but are long (millisecond) epoch values when persisted in the Pro project document. Check for both conditions.</summary>
+                     **/
                     DateTime graphicElementDateTime(GraphicElement gelt) {
                         var datetimeAttr = gelt.GetGraphic().Attributes[FIELD_TIMESTAMP];
-                        // Strangely, datetime fields are extracted as .NET DateTime type when the tracks graphics are first generated...
-                        // ...but are long (millisecond) epoch values when persisted in the Pro project document. Check for both conditions.
                         DateTime datetime = datetimeAttr is long
                             ? DateTimeOffset.FromUnixTimeMilliseconds((long)datetimeAttr).DateTime.ToLocalTime()
                             : (DateTime)datetimeAttr;
