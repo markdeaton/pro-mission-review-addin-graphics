@@ -504,7 +504,7 @@ namespace MissionAgentReview {
                     mapView?.RemoveExploratoryAnalysisAsync(tsv); 
                     tsv.Dispose();
                     tsv = newViewshed;
-                    mapView?.AddExploratoryAnalysis(tsv);
+                    mapView?.AddExploratoryAnalysisAsync(tsv);
                 }
                 _dctGLViewshed[lyr] = tsv;
             }
@@ -523,7 +523,7 @@ namespace MissionAgentReview {
                     mapView?.RemoveExploratoryAnalysisAsync(tsv);
                     tsv.Dispose();
                     tsv = newViewshed;
-                    mapView?.AddExploratoryAnalysis(tsv);
+                    mapView?.AddExploratoryAnalysisAsync(tsv);
                 }
                 _dctGLViewshed[lyr] = tsv;
             }
@@ -555,7 +555,7 @@ namespace MissionAgentReview {
                         //mapView?.RemoveExploratoryAnalysis(tsvInvalid);
                         mapView?.RemoveExploratoryAnalysisAsync(tsvInvalid); 
                         tsvInvalid.Dispose();
-                        mapView?.AddExploratoryAnalysis(newViewshed);
+                        mapView?.AddExploratoryAnalysisAsync(newViewshed);
                         _dctGLViewshed[glyr] = newViewshed;
                     }
                     // And finally, start the sequence
@@ -589,7 +589,7 @@ namespace MissionAgentReview {
                 //Create placeholder camera for now
                 //Camera cam = new Camera(0, 0, 0, 0, 0, SpatialReferences.WebMercator);
                 TimeSequencingViewshed tsv = new TimeSequencingViewshed(MapView.Active.Map.SpatialReference, VERT_ANGLE, HORIZ_ANGLE, MIN_DIST, MAX_DIST);
-                MapView.Active?.AddExploratoryAnalysis(tsv);
+                MapView.Active?.AddExploratoryAnalysisAsync(tsv);
 
                 if (tsv?.Viewpoints == null) BuildViewpoints(glyr, tsv);
                 return tsv;
