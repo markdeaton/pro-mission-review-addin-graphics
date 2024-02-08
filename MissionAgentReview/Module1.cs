@@ -14,10 +14,8 @@ using ArcGIS.Core.CIM;
 using ArcGIS.Core.Data;
 using ArcGIS.Core.Events;
 using ArcGIS.Core.Geometry;
-using ArcGIS.Core.Internal.Geometry;
 using ArcGIS.Desktop.Core;
 using ArcGIS.Desktop.Core.Portal;
-using ArcGIS.Desktop.Editing;
 using ArcGIS.Desktop.Framework;
 using ArcGIS.Desktop.Framework.Contracts;
 using ArcGIS.Desktop.Framework.Dialogs;
@@ -375,7 +373,7 @@ namespace MissionAgentReview {
             }
             CIMLineGraphic CreateAgentTrackLinkGraphic(Feature feat, MapPoint ptStart, MapPoint ptEnd, CIMSymbolReference symbolRef) {
                 CIMLineGraphic link = new CIMLineGraphic() {
-                    Line = PolylineBuilder.CreatePolyline(new List<MapPoint>() { ptStart, ptEnd }),
+                    Line = PolylineBuilderEx.CreatePolyline(new List<MapPoint>() { ptStart, ptEnd }),
                     Symbol = symbolRef
                 };
                 // Fill in attributes from feature

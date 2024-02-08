@@ -2,8 +2,7 @@
   "profiles": {
     "MissionAgentReview": {
       "commandName": "Executable",
-      "executablePath": "C:\\Program Files\\ArcGIS\\Pro\\bin\\ArcGISPro.exe",
-      "commandLineArgs": ""
+      "executablePath": "C:\\Users\\mark4238\\AppData\\Local\\Programs\\ArcGIS\\Pro\\bin\\ArcGISPro.exe"
     }
   }
 }
